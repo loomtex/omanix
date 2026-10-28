@@ -22,6 +22,21 @@ in
     grep -q 'omarchy' ${f}/NOTICE
   '';
 
+  # hl.* used by the shipped Lua/QML is a subset of hl-symbols.txt, and every
+  # listed name is registered by the packaged Hyprland (or the titlebars plugin).
+  hl-symbols = run "hl-symbols" ''
+    python3 -I ${f}/tools/forkcheck.py hlsyms ${pkgs.omarchy-src} ${f}/hl-symbols.txt \
+      ${pkgs.hyprland-omarchy.src} ${pkgs.omarchy-hyprland-titlebars.src}
+  '';
+
+  # Every shipped Lua file parses with the Lua Hyprland links (5.5).
+  fork-lua = run "fork-lua" ''
+    find ${pkgs.omarchy-src} -name '*.lua' -print0 | xargs -0 -n1 ${pkgs.lua5_5}/bin/luac -p --
+  '';
+
+  # The titlebars .so loads in a (VM) Hyprland built from the same derivation.
+  titlebars-smoke = import ../tests/titlebars-smoke.nix { inherit pkgs; };
+
   # Stage 6 runs inside the build; this keeps it in the check list.
   omarchy-src = pkgs.omarchy-src;
 }

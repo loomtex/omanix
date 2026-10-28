@@ -2191,7 +2191,7 @@ Template fields are only `{label}` (upstream row label after i18n), `{value}` (p
 
 | Key | Upstream | omanix |
 |---|---|---|
-| `SUPER + A` | unbound in `utilities.lua` (U25) | `omarchy-shell omanix.chat toggle` (`omanix.chat.keybind`) |
+| `SUPER + A` | upstream "Select all" in `clipboard.lua` (U25 was false) | `omarchy-shell omanix.chat toggle` (`omanix.chat.keybind`); Select all moves to `SUPER + SHIFT + CTRL + A`, freed by dropping `omarchy-agent --pick` (Josh, 2026-10-28) |
 | `SUPER + SHIFT + CTRL + A` | `omarchy-agent --pick` (the human's own harness) | `omarchy-shell omanix.chat toggle` |
 | `SUPER + ALT + A` | — | `omarchy-shell omanix.approval open` |
 | `SUPER + grave` (qconsole) | `special:qconsole` with `omarchy-agent` | unchanged: the human's own terminal harness, if they set one |
@@ -2428,7 +2428,7 @@ Rev 3's U1–U9, U14, U16–U18 concerned dropped machinery and are listed in Ap
 | U22 | Which `omarchy` icon-font codepoints are brand glyphs, and whether the bar uses them | glyph dump + grep `shell/**`; VM screenshot with `omanix-glyphs` |
 | U23 | Theme backgrounds/videos are redistributable or have separate credits | porting report step 9 at `5978d93`; unattributed files are excluded |
 | U24 | Patched QML (P1, P5, P7, P8, P10–P13, P17–P19) loads under quickshell `2b4501a` with Qt 6.12 | `qmllint` post-check + `desktop-boots` |
-| U25 | `SUPER + A` is unbound in the upstream Lua at `5978d93` | replay bindings under the recording `hl.*` stub; otherwise pick the first free chord |
+| U25 | ~~`SUPER + A` is unbound in the upstream Lua at `5978d93`~~ **Settled false (W3):** it is "Select all". Josh chose chat on `SUPER + A`; P9 moves Select all to `SUPER + SHIFT + CTRL + A`. | — |
 | U26 | nixpkgs/nixos-hardware cover intel-lpmd, ipu7, asus/dell firmware, framework-16, surface, apple-t2, tuxedo-drivers | `nix eval` each attribute; missing ones are packaged or deferred |
 | U27 | omarchy's NvPCR drop-ins are neutral to loom's PCR 7 policy | swtpm + SB VM, enroll with and without them, reboot 3×; adopt only if neutral |
 | U28 | The keyboard picker override works when the HM `keyboard-layouts`/`input.lua` are read-only and the live `kb_layout` check passes | `writers-respect-hm` keyboard case |

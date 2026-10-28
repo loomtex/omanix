@@ -5,17 +5,28 @@ MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-SUPER+SHIFT+CTRL+A was omarchy-agent --pick (the human's own harness); it
-now toggles omanix.chat. SUPER+ALT+A opens omanix.approval. SUPER+A is NOT
-rebound: at v4.5.0-rc2 it is upstream's "Select all" in clipboard.lua, so
-U25 ("unbound") does not hold; moving chat there is a design decision
-(DESIGN §h.5.4).
+SUPER+A toggles omanix.chat (Josh, 2026-10-28: chat is the primary UI, so
+it gets the easiest chord). Upstream's "Select all" on SUPER+A moves to
+SUPER+SHIFT+CTRL+A, freed by dropping omarchy-agent --pick (the human's own
+harness). SUPER+ALT+A opens omanix.approval.
 ---
- default/hypr/bindings/utilities.lua | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
+diff --git a/default/hypr/bindings/clipboard.lua b/default/hypr/bindings/clipboard.lua
+index a44fe15..7a14bde 100644
+--- a/default/hypr/bindings/clipboard.lua
++++ b/default/hypr/bindings/clipboard.lua
+@@ -42,7 +42,9 @@ local function universal_clipboard_shortcut(default_mods, default_key, terminal_
+   end
+ end
+ 
+-o.bind("SUPER + A", "Select all", send_shortcut_once("CTRL", "A"))
++-- omanix: SUPER + A opens the agent chat (utilities.lua); Select all moves
++-- to the chord upstream used for omarchy-agent --pick.
++o.bind("SUPER + SHIFT + CTRL + A", "Select all", send_shortcut_once("CTRL", "A"))
+ o.bind("SUPER + C", "Universal copy", universal_clipboard_shortcut("CTRL", "C", "CTRL SHIFT", "C"))
+ o.bind("SUPER + V", "Universal paste", universal_clipboard_shortcut("CTRL", "V", "CTRL SHIFT", "V"))
+ o.bind("SUPER + X", "Universal cut", send_shortcut_once("CTRL", "X"))
 diff --git a/default/hypr/bindings/utilities.lua b/default/hypr/bindings/utilities.lua
-index 4f00ca8..6aad6fe 100644
+index 4f00ca8..fd6c723 100644
 --- a/default/hypr/bindings/utilities.lua
 +++ b/default/hypr/bindings/utilities.lua
 @@ -97,7 +97,10 @@ o.bind("SUPER + CTRL + ALT + T", "Show time", "omarchy-notification-time")
@@ -24,8 +35,8 @@ index 4f00ca8..6aad6fe 100644
  
 -o.bind("SUPER + SHIFT + CTRL + A", "Agent", "omarchy-agent --pick")
 +-- omanix: the agent keys open the resident's chat and the approval card
-+-- (DESIGN §h.5.4). SUPER + A stays upstream's "Select all" (clipboard.lua).
-+o.bind("SUPER + SHIFT + CTRL + A", "Agent chat", "omarchy-shell omanix.chat toggle")
++-- (DESIGN §h.5.4). Select all moved to SUPER + SHIFT + CTRL + A (clipboard.lua).
++o.bind("SUPER + A", "Agent chat", "omarchy-shell omanix.chat toggle")
 +o.bind("SUPER + ALT + A", "Approvals", "omarchy-shell omanix.approval open")
  o.bind("SUPER + CTRL + A", "Audio", { panel = "omarchy.audio" })
  o.bind("SUPER + CTRL + B", "Bluetooth", { panel = "omarchy.bluetooth" })

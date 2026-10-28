@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-dns sha256 258bea5f2a1db7f3edd67e5d7ed4c14c5c4c5dc96608c5cdafb8970d2a8bc7fb
+# Read-only: prints the declared DNS provider from the omanix catalog, as upstream's
+# no-argument form did. Changing it is a request to the agent (AGENT-INTENT).
+
+if (($# > 0)); then
+  echo "The DNS provider is set in your host configuration. Ask your agent to change it." >&2
+  exit 2
+fi
+
+jq -r '.omanix.dns.provider // empty' /run/current-system/sw/share/omanix/catalog/config.json 2>/dev/null

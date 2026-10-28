@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-update-time sha256 72fac707c08f25f0321a3916ed8227e3737c8cc4c3d6bb93c9d4c98531f78c6f
+# omarchy:summary=Restart system time synchronization
+# omanix: no sudo; a polkit rule lets the active local user restart this one
+# unit (privilege = polkit).
+
+echo "Updating time..."
+systemctl restart systemd-timesyncd

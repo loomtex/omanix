@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-channel-current sha256 72c6abc2d877e5af46230c61ac82c252fa4b28c0d15b614c261d7a65b8100c32
+# Read-only: prints the declared omanix release channel from the omanix catalog, as upstream's
+# no-argument form did. Changing it is a request to the agent (AGENT-INTENT).
+
+if (($# > 0)); then
+  echo "The omanix release channel is set in your host configuration. Ask your agent to change it." >&2
+  exit 2
+fi
+
+jq -r '.omanix.release.channel // empty' /run/current-system/sw/share/omanix/catalog/config.json 2>/dev/null

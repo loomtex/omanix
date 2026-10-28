@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-pkg-present sha256 3d6b2d498a3ebdf7b9784c7e464bb30af99bce1ce60ab74a269e67efb88fb82b
+# Present when every name is in the nix package manifests (system + user
+# profile), written by the omanix modules. There is no package manager to ask.
+
+omanix_pkg_manifests=(/run/current-system/sw/share/omanix/packages.txt "/etc/profiles/per-user/${USER:-$(id -un)}/share/omanix/packages.txt")
+
+for pkg in "$@"; do
+  grep -qxF -- "$pkg" "${omanix_pkg_manifests[@]}" 2>/dev/null || exit 1
+done
+exit 0

@@ -1,0 +1,47 @@
+# Path globs (Appendix C DROP rows; §f.2.3).
+migrations
+shell/plugins/dev-gallery
+config/autostart/limine-snapper-notify.desktop
+default/pacman
+default/libalpm
+default/limine
+default/snapper
+default/regions
+default/systemd/user/omarchy-migrate-notify.service
+default/systemd/system/systemd-pcrlogin@.service.d
+default/systemd/system/systemd-pcrproduct.service.d
+default/systemd/system/systemd-tpm2-setup-early.service.d
+default/omarchy/sudo-no-update
+etc/sudoers.d
+etc/mkinitcpio.conf.d
+etc/limine-entry-tool.d
+etc/tmpfiles.d/omarchy-nopasswd-sudo.conf
+etc/mise/conf.d/omarchy-tools.toml
+etc/mise/conf.d/omarchy-agent-accounts.toml
+
+# install/: provisioning is DROP; its RE-EXPRESS parts (package lists, quirk
+# scripts, user/login setup) are read from inputs.omarchy at eval time by the
+# modules and quirk rows, so nothing under install/ ships.
+install
+
+# Branding and the meaningless version file (P16 adds omanix branding).
+logo.svg
+logo.txt
+icon.png
+icon.txt
+version
+
+# Contributor material: readable in the pinned source, not shipped.
+agents
+AGENTS.md
+CLAUDE.md
+README.md
+docs
+plans
+scripts
+test
+.github
+.editorconfig
+.gitignore
+.greptile
+.luarc.json

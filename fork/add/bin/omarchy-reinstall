@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-reinstall sha256 b666b612f76c8a8b44c32a4447acd9546aa5bcf2fd1cc36a46c9a82f5e5848ac
+# omarchy:summary=Reset configs to the declared defaults (packages are declared; nothing to reinstall).
+# The HM-owned files are read-only; resetting means clearing the runtime
+# overlay on top of them (omanix reset, §f.4.8).
+
+set -e
+if gum confirm "Clear every runtime change to your configs?"; then
+  omanix reset --all
+fi

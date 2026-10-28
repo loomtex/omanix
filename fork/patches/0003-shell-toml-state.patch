@@ -1,0 +1,40 @@
+From: Ada <ada@6bit.com>
+Date: Wed, 28 Oct 2026 17:01:32 -0600
+Subject: [PATCH] P3: the user shell.toml lives in runtime state
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Reader (Commons/Color.qml) and writer (omarchy-display-text-size) both use
+~/.local/state/omanix/shell/shell.toml (DESIGN §f.2.5 P3).
+---
+ bin/omarchy-display-text-size | 2 +-
+ shell/Commons/Color.qml       | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/bin/omarchy-display-text-size b/bin/omarchy-display-text-size
+index 5490fe6..404dde6 100755
+--- a/bin/omarchy-display-text-size
++++ b/bin/omarchy-display-text-size
+@@ -23,7 +23,7 @@ GKEY_NAME="text-scaling-factor"
+ TERM_DEFAULT_PT=9
+ SHELL_DEFAULT_PX=12
+ 
+-shell_config="$HOME/.config/omarchy/shell.toml"
++shell_config="$HOME/.local/state/omanix/shell/shell.toml"
+ 
+ usage() {
+   echo "Usage: omarchy-display-text-size [size|reset]"
+diff --git a/shell/Commons/Color.qml b/shell/Commons/Color.qml
+index 0dbcbf6..10e9820 100644
+--- a/shell/Commons/Color.qml
++++ b/shell/Commons/Color.qml
+@@ -245,7 +245,7 @@ QtObject {
+   // CLI takes effect live without restarting the shell; absent by default.
+   property FileView userShellFile: FileView {
+     id: userShellFile
+-    path: root.home + "/.config/omarchy/shell.toml"
++    path: root.home + "/.local/state/omanix/shell/shell.toml"
+     watchChanges: true
+     printErrors: false
+     onLoaded: root.loadUserShell(text())

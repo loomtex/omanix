@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-refresh-tmux sha256 3bb77fb6c6d42ae5871f15c8ff2fc47f30845d51aade46115bcd3d98b3b5737f
+# omarchy:summary=Clear the tmux runtime overlay and reload tmux.
+# The HM-owned files are read-only; resetting means clearing the runtime
+# overlay on top of them (omanix reset, §f.4.8).
+
+omanix reset tmux
+omarchy-restart-tmux

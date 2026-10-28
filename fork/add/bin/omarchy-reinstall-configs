@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-reinstall-configs sha256 d9abe210296025eacefccde07de805c89f164d2c7832da56eb5b1363ad3d0160
+# omarchy:summary=Clear every runtime overlay back to the declared configuration.
+# The HM-owned files are read-only; resetting means clearing the runtime
+# overlay on top of them (omanix reset, §f.4.8).
+
+set -euo pipefail
+exec omanix reset --all

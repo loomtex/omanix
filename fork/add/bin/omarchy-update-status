@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-update-status sha256 fdca38ed49e781a8383a5ac5a6a8429b923ef07b0cabbb815d7893f4b75a8b16
+omarchy-shell -q omarchy.system-update clear

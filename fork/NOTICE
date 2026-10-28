@@ -1,0 +1,5 @@
+omanix contains a modified copy of omarchy (https://github.com/omacom/omarchy)
+at v4.5.0-rc2, Copyright (c) David Heinemeier Hansson, used under the MIT
+License (LICENSES/omarchy-MIT.txt). Modifications are the files under fork/
+and are Copyright (c) 2026 Joshua Perry and Ada. omanix is an independent
+project and is not affiliated with or endorsed by the omarchy project.

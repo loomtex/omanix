@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-default-dictation sha256 36655c24ccd2756e978e6b18256b238e70185a3ba9d6b098f87ab9aeafb122c9
+# Read-only: prints the declared dictation backend from the omanix catalog, as upstream's
+# no-argument form did. Changing it is a request to the agent (AGENT-INTENT).
+
+if (($# > 0)); then
+  echo "The dictation backend is set in your host configuration. Ask your agent to change it." >&2
+  exit 2
+fi
+
+jq -r '.omanix.defaults.dictation // empty' /run/current-system/sw/share/omanix/catalog/config.json 2>/dev/null

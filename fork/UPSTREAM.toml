@@ -1,0 +1,14 @@
+# The fork point (D2). Moving it is a human decision recorded as a new D-number;
+# `nix run .#porting-report -- --to <tag|rev>` prepares the port (§f.2.7).
+url = "https://github.com/omacom/omarchy"
+tag = "v4.5.0-rc2"                                   # lightweight tag
+rev = "5978d93ae7da0a325b7493501911e3f1266cadd3"
+date = "2026-10-27"
+license = "MIT"
+license_sha256 = "717ba1949502290f8e47688ae2e323acd06c8ca47aec9f7596b15f678c1af4a2"
+why = """
+Release tags only (D2). v4.5.0-rc2 is the first tag on the quattro line that
+needs Hyprland >= 0.56 (hl.dsp.workspace.change_id, hl.get_loaded_plugins),
+which nixos-unstable ships. The `version` file reads 4.0.0.alpha on every tag;
+pin by rev, never by that file.
+"""

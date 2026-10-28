@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-refresh-herdr sha256 a2db4f1394a23d6b03ee9a4f82a35bf13339f81c72ef8f645931282f5425a938
+# omarchy:summary=Clear the herdr runtime overlay and reload herdr.
+# The HM-owned files are read-only; resetting means clearing the runtime
+# overlay on top of them (omanix reset, §f.4.8).
+
+omanix reset herdr
+omarchy-restart-herdr

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-refresh-config sha256 d20b953a776b5adc681dfed4c839df2bff999989ad96ccbcc51853ea7f1ab92f
+# omarchy:summary=Clear the runtime overlay for one config path (relative to ~/.config).
+# The HM-owned files are read-only; resetting means clearing the runtime
+# overlay on top of them (omanix reset, §f.4.8).
+
+if [[ -z ${1:-} ]]; then
+  echo "Usage: $0 <config-path>   (relative to ~/.config, e.g. hypr/monitors.lua)" >&2
+  exit 1
+fi
+exec omanix reset "$1"

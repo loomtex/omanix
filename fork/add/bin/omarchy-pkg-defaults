@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-pkg-defaults sha256 6a71de3dcc4103816b4660b9d97f4e08426c5b063cecc36733a5f0ddb83f7080
+# The default package set is omanix.packages.base; print what the running
+# system was built with.
+
+cat /run/current-system/sw/share/omanix/packages.txt

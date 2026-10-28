@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-version-pkgs sha256 400aef8f7322bcd84fb9fa920228e140131308ef3cc1075602c1ff3c0a6027df
+# When the running system was last switched to (the nix system profile).
+
+updated=$(stat -c %Y /nix/var/nix/profiles/system 2>/dev/null) || exit 1
+omarchy-i18n about.updatedAt \
+  "$(date -d "@$updated" +"%A %d %B %Y")" \
+  "$(date -d "@$updated" +"%H:%M")"

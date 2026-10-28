@@ -1,0 +1,56 @@
+From: Ada <ada@6bit.com>
+Date: Wed, 28 Oct 2026 17:02:03 -0600
+Subject: [PATCH] P15: env-bootstrap resets OMARCHY_PATH to
+ /run/current-system/omarchy
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Upstream force-resets it to /usr/share/omarchy (or a dev-link override from
+/etc/omarchy.conf, which omanix drops). On NixOS the tree is the running
+generation's /run/current-system/omarchy and its bin/ must be on PATH
+(DESIGN §f.2.5 P15, §f.2.9).
+---
+ default/bash/env-bootstrap | 27 +++++++++------------------
+ 1 file changed, 9 insertions(+), 18 deletions(-)
+
+diff --git a/default/bash/env-bootstrap b/default/bash/env-bootstrap
+index f88a4a8..6eaeede 100644
+--- a/default/bash/env-bootstrap
++++ b/default/bash/env-bootstrap
+@@ -4,26 +4,17 @@
+ #   /usr/share/uwsm/env.d/10-omarchy          (Hyprland session via uwsm)
+ #   /usr/share/omarchy/default/bash/envs      (bash rc chain; SSH/non-login)
+ 
+-# /etc/omarchy.conf is written by omarchy-dev-link and reset by
+-# omarchy-dev-unlink. When absent, force the packaged default instead of
+-# preserving a stale inherited value.
+-if [ -f /etc/omarchy.conf ]; then
+-  . /etc/omarchy.conf
+-  : "${OMARCHY_PATH:=/usr/share/omarchy}"
+-else
+-  OMARCHY_PATH=/usr/share/omarchy
+-fi
++# omanix: OMARCHY_PATH is the running generation's tree, which a switch
++# retargets atomically. A stale inherited value (an old store path, or
++# upstream's /usr/share/omarchy) is reset here, and $OMARCHY_PATH/bin always
++# goes on PATH because nothing installs omarchy-* into /usr/bin.
++OMARCHY_PATH=/run/current-system/omarchy
+ export OMARCHY_PATH
+ 
+-# Only prepend in dev-link mode. On a production install, the binaries are
+-# already on PATH as /usr/bin/omarchy-* via the omarchy package — prepending
+-# /usr/share/omarchy/bin would just be noise.
+-if [ "$OMARCHY_PATH" != /usr/share/omarchy ]; then
+-  case ":$PATH:" in
+-    *":${OMARCHY_PATH%/}/bin:"*) ;;
+-    *) PATH="${OMARCHY_PATH%/}/bin${PATH:+:$PATH}" ;;
+-  esac
+-fi
++case ":$PATH:" in
++  *":${OMARCHY_PATH}/bin:"*) ;;
++  *) PATH="${OMARCHY_PATH}/bin${PATH:+:$PATH}" ;;
++esac
+ 
+ # mise's command wrappers must precede real tool directories inherited from a
+ # parent shell, so scripts follow account switches without Bash functions.

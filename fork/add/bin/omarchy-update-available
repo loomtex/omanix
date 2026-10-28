@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-update-available sha256 257387ccfcca6211f7bc6bf2cc500bd07d4066c8354f7b869400bc5153e6d645
+# Prints one line per available update, like upstream, from loom's update
+# state (an "Update ready" card is waiting). Exit 1 when there is none.
+
+state=/var/lib/loom/update/available
+[[ -s $state ]] || exit 1
+cat "$state"

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-refresh-hyprland sha256 4860c774ac268786edc869f43466a4ffccd6eed34e9310afe8a7f843a2108417
+# omarchy:summary=Clear the Hyprland runtime overlays and reset toggles to the defaults.
+# The HM-owned files are read-only; resetting means clearing the runtime
+# overlay on top of them (omanix reset, §f.4.8).
+
+omanix reset hypr
+mkdir -p ~/.local/state/omarchy/toggles/hypr
+cp "$OMARCHY_PATH/default/hypr/toggles/flags.lua" ~/.local/state/omarchy/toggles/hypr/
+chmod u+w ~/.local/state/omarchy/toggles/hypr/flags.lua

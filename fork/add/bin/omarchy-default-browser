@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-default-browser sha256 5019c574ad374ca8ed3b1a454b66929d9d9f13c071fcbc33acd62c8be3fc3faa
+# Read-only: prints the declared default browser from the omanix catalog, as upstream's
+# no-argument form did. Changing it is a request to the agent (AGENT-INTENT).
+
+if (($# > 0)); then
+  echo "The default browser is set in your host configuration. Ask your agent to change it." >&2
+  exit 2
+fi
+
+jq -r '.omanix.defaults.browser // empty' /run/current-system/sw/share/omanix/catalog/config.json 2>/dev/null

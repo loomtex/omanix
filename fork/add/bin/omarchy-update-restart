@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-update-restart sha256 faaa8fa9c9534c7f699d62c014ff5eb2a26f9f109e0bdd54080a041ebca2bf9a
+# After a switch, services are already restarted by switch-to-configuration;
+# only a new kernel or initrd needs a reboot.
+
+booted=$(readlink -f /run/booted-system/kernel 2>/dev/null)
+current=$(readlink -f /run/current-system/kernel 2>/dev/null)
+booted_initrd=$(readlink -f /run/booted-system/initrd 2>/dev/null)
+current_initrd=$(readlink -f /run/current-system/initrd 2>/dev/null)
+
+if [[ ${1:-all} == --services-only ]]; then
+  exit 0
+fi
+
+if [[ $booted != "$current" || $booted_initrd != "$current_initrd" ]]; then
+  echo "A new kernel is installed. Run omarchy-system reboot when ready."
+fi

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-default-editor sha256 6b2040d0a6762af5bba76b30d9dddace48505ccd8bb6c19de25990f5b20c52ab
+# Read-only: prints the declared default editor from the omanix catalog, as upstream's
+# no-argument form did. Changing it is a request to the agent (AGENT-INTENT).
+
+if (($# > 0)); then
+  echo "The default editor is set in your host configuration. Ask your agent to change it." >&2
+  exit 2
+fi
+
+jq -r '.omanix.defaults.editor // empty' /run/current-system/sw/share/omanix/catalog/config.json 2>/dev/null

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-restart-trackpad sha256 90d54e88d2dd551830e2ae2bb58215716dde7dcb899f228140087511f69fd169
+# omarchy:summary=Reset the trackpad by unbinding and rebinding its driver.
+# omanix: the i2c unbind/rebind and the intel_quicki2c reload run in the root
+# oneshot omanix-trackpad-reset.service, which the active local user may start
+# through polkit (privilege = unit).
+
+echo "Resetting the trackpad..."
+systemctl start omanix-trackpad-reset.service && echo "Done"

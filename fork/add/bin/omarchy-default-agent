@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-default-agent sha256 f3001a12767b168877e0093c024d5e1f03b8d37cbb26fafbd1004cff2c08179e
+# Read-only: prints the declared default coding agent from the omanix catalog, as upstream's
+# no-argument form did. Changing it is a request to the agent (AGENT-INTENT).
+
+if (($# > 0)); then
+  echo "The default coding agent is set in your host configuration. Ask your agent to change it." >&2
+  exit 2
+fi
+
+jq -r '.omanix.defaults.agent // empty' /run/current-system/sw/share/omanix/catalog/config.json 2>/dev/null

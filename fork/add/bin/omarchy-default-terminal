@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-default-terminal sha256 f1dccc23c3bf553d80860c06ebc1334574a9ff0868b7af73a562c63ef81d7e25
+# Read-only: prints the declared default terminal from the omanix catalog, as upstream's
+# no-argument form did. Changing it is a request to the agent (AGENT-INTENT).
+
+if (($# > 0)); then
+  echo "The default terminal is set in your host configuration. Ask your agent to change it." >&2
+  exit 2
+fi
+
+jq -r '.omanix.defaults.terminal // empty' /run/current-system/sw/share/omanix/catalog/config.json 2>/dev/null

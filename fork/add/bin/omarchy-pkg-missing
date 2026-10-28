@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-pkg-missing sha256 2cfa64af694cc58dddd2b7e0d8ecb3f900b52dc95dc317eac5a82e0d83990d93
+# Missing when any name is absent from the nix package manifests (see
+# omarchy-pkg-present).
+
+omanix_pkg_manifests=(/run/current-system/sw/share/omanix/packages.txt "/etc/profiles/per-user/${USER:-$(id -un)}/share/omanix/packages.txt")
+
+for pkg in "$@"; do
+  grep -qxF -- "$pkg" "${omanix_pkg_manifests[@]}" 2>/dev/null || exit 0
+done
+exit 1

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-version sha256 beea763bfa1e1a9be5147314027fa6672772c657a470c2325ddfb359acb2d678
+# The omanix release, recorded by the omanix modules.
+
+[[ -s /etc/omanix/version ]] || exit 1
+cat /etc/omanix/version

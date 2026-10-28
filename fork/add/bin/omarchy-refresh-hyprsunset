@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-refresh-hyprsunset sha256 b0d48f8a811a930359a245675d8c5af814de43c0b45fc58f92eeb38b18c76af3
+# omarchy:summary=Clear the hyprsunset runtime overlay and restart it.
+# The HM-owned files are read-only; resetting means clearing the runtime
+# overlay on top of them (omanix reset, §f.4.8).
+
+omanix reset hypr/hyprsunset.conf
+omarchy-restart-hyprsunset

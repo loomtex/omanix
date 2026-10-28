@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-refresh-shell sha256 d36a91232b57d10df0dde31c772af4b7a33d3f1edbc567ba87aeb9ea07584910
+# omarchy:summary=Reset the shell settings to the declared defaults.
+# The HM-owned files are read-only; resetting means clearing the runtime
+# overlay on top of them (omanix reset, §f.4.8).
+
+set -euo pipefail
+omanix reset shell
+omarchy-restart-shell

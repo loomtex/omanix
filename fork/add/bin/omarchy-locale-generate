@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-locale-generate sha256 3a1503b8653d2cbd27df66f320fa07874c8f7f8f1dc9c0a0d93ca932df3db97d
+# Locales are declared (i18n.supportedLocales), not generated at runtime.
+# Succeeds when the locale for <code> is already available.
+
+code=${1:-}
+if (( $# != 1 )) || [[ ! $code =~ ^[a-z]{2,3}(-[A-Za-z]{2})?$ ]]; then
+  echo "Usage: omarchy-locale-generate <code>" >&2
+  exit 1
+fi
+
+locale=$(jq -r --arg code "$code" '.[$code].locale // empty' "$OMARCHY_PATH/default/i18n/locales.json")
+if [[ -z $locale ]]; then
+  echo "Unknown language code: $code" >&2
+  exit 1
+fi
+
+if locale -a 2>/dev/null | grep -qixF -- "${locale/UTF-8/utf8}"; then
+  exit 0
+fi
+echo "The $locale locale is not installed. Ask your agent to add it." >&2
+exit 2

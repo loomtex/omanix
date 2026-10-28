@@ -1,0 +1,32 @@
+From: Ada <ada@6bit.com>
+Date: Wed, 28 Oct 2026 17:01:54 -0600
+Subject: [PATCH] P9: agent keys open the resident chat and the approval card
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+SUPER+SHIFT+CTRL+A was omarchy-agent --pick (the human's own harness); it
+now toggles omanix.chat. SUPER+ALT+A opens omanix.approval. SUPER+A is NOT
+rebound: at v4.5.0-rc2 it is upstream's "Select all" in clipboard.lua, so
+U25 ("unbound") does not hold; moving chat there is a design decision
+(DESIGN §h.5.4).
+---
+ default/hypr/bindings/utilities.lua | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/default/hypr/bindings/utilities.lua b/default/hypr/bindings/utilities.lua
+index 4f00ca8..6aad6fe 100644
+--- a/default/hypr/bindings/utilities.lua
++++ b/default/hypr/bindings/utilities.lua
+@@ -97,7 +97,10 @@ o.bind("SUPER + CTRL + ALT + T", "Show time", "omarchy-notification-time")
+ o.bind("SUPER + CTRL + ALT + B", "Show battery remaining", "omarchy-notification-battery")
+ o.bind("SUPER + CTRL + ALT + W", "Toggle weather", "omarchy-notification-weather")
+ 
+-o.bind("SUPER + SHIFT + CTRL + A", "Agent", "omarchy-agent --pick")
++-- omanix: the agent keys open the resident's chat and the approval card
++-- (DESIGN §h.5.4). SUPER + A stays upstream's "Select all" (clipboard.lua).
++o.bind("SUPER + SHIFT + CTRL + A", "Agent chat", "omarchy-shell omanix.chat toggle")
++o.bind("SUPER + ALT + A", "Approvals", "omarchy-shell omanix.approval open")
+ o.bind("SUPER + CTRL + A", "Audio", { panel = "omarchy.audio" })
+ o.bind("SUPER + CTRL + B", "Bluetooth", { panel = "omarchy.bluetooth" })
+ o.bind("SUPER + CTRL + D", "Display", { panel = "omarchy.monitor" })

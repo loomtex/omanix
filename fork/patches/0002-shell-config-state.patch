@@ -1,0 +1,25 @@
+From: Ada <ada@6bit.com>
+Date: Wed, 28 Oct 2026 17:01:32 -0600
+Subject: [PATCH] P2: omarchy-shell-config writes the runtime shell.json
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Same path as P1 (DESIGN §f.2.5 P2).
+---
+ bin/omarchy-shell-config | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bin/omarchy-shell-config b/bin/omarchy-shell-config
+index 7958518..100f71b 100755
+--- a/bin/omarchy-shell-config
++++ b/bin/omarchy-shell-config
+@@ -3,7 +3,7 @@
+ # omarchy:summary=Shared helpers for editing ~/.config/omarchy/shell.json (source this, don't run it).
+ # omarchy:hidden=true
+ 
+-CONFIG_FILE="$HOME/.config/omarchy/shell.json"
++CONFIG_FILE="$HOME/.local/state/omanix/shell/shell.json"
+ DEFAULTS_FILE="$OMARCHY_PATH/config/omarchy/shell.json"
+ 
+ fail() {

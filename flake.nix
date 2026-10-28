@@ -38,6 +38,8 @@
       checks = forAllSystems (system:
         import ./checks { pkgs = pkgsFor system; inherit self; });
 
+      apps = forAllSystems (system: import ./apps { pkgs = pkgsFor system; });
+
       formatter = forAllSystems (system: (pkgsFor system).nixfmt-rfc-style);
     };
 }

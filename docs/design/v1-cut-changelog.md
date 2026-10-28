@@ -39,3 +39,22 @@ Josh: a privileged switch service is more complex than a couple of sudoers entri
 **Demo.** New scene 5 "Explain this sudo" (Wi-Fi script with an unrequested line flagged); later scenes renumbered 6–9; `vm-demo-2..7`.
 
 **Work packages.** W1 = nuketown approval changes (day one); loom glue moved into W11; W8 = loom-switch + collector; W10 = reviewer wiring; W18 adds the prompter. Critical paths: pipeline W0 + W1 → W11 → W8 → W10 → W21; installer W0 → W6 → W4 → W14 → W20; desktop W3 + W5 → W15 → W18 → W19 → W20 (longest).
+
+# Rev 5.1 (2026-10-28): approval service user, built (V8.1)
+
+Backup of rev 5: `scratchpad/DESIGN.rev5.md`.
+
+**Architecture.** Josh replaced rev 5's root `nuketown-approve-run` with an unprivileged `nuketown-approval` system user that does the request work and reaches root only via `sudo` (so each step is logged), and only runs the approved command as root. Agents' only sudo rule starts `nuketown-approve` as that user; agents left the `nuketown-broker` group.
+
+**Built in nuketown** (`master`: `7a2b84e` bypass fixes, pushed; `6b4960c` service user, `eafb45f` VM tests, `6b9e5c1` CLAUDE.md, not pushed). §a.3 rewritten as K1–K12 with a State column: K1–K6, K8–K12 built; K7 (kinds) and `--requester`, `NUKETOWN_APPROVAL_DIR`, deny reasons and prompt-before-review moved to a new **W1b**.
+
+**Differences from rev 5 as written.**
+- Snapshots are read as the requester (`sudo -u <agent> nuketown-approval-read`), stored as `snapshots/<n>/<basename>`, listed in `request.json` (no `files.json`); an unreadable program or interpreter script refuses the request before asking.
+- The review runs synchronously before the ask, bounded by `reviewer.timeout` (45 s); `promptDelay` is W1b. Output schema is `{summary, risk, recommendation: approve|deny|ask, notes, not_shown}` (was `oneLine/explanation/cannotSee/matchesReason/concerns`, `look-closer`); `review.json` status is `ok|unavailable|disabled`.
+- Prompter contract: exit status (0 approve), not an `APPROVED`/`DENIED: reason` line; the zenity button is **Show files**.
+- New K11 (service user) and K12 (journal record + persisted audit copy, pruned after 30 days).
+- Request directory is `nuketown-approval:nuketown-approval-read`, setgid `2751`, removed when the request ends.
+
+**Tests.** `vm-sudo-approval-bypass` (rewritten) and `vm-approval-flow` (new) replace `nuketown-sudoex-bypass`, `nuketown-setenv-bypass`, `nuketown-argv-newline`, `approval-review-snapshot`, `approval-review-unavailable`; nuketown pure checks `module-approval-sudoers`, `module-approval-reviewer`, `signi-compat`. U39 settled.
+
+**Work packages.** W1 marked built; W1b added (K7 and the rest); pipeline critical path W0 + W1b → W11 → W8 → W10 → W21.

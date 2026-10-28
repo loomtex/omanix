@@ -1,12 +1,14 @@
 # omanix: design
 
-Rev 5, 2026-10-28 (v1 scope cut; reviewed sudo). Authors: Ada, with Joshua Perry.
+Rev 5.1, 2026-10-28 (v1 scope cut; reviewed sudo; approval service user built). Authors: Ada, with Joshua Perry.
 
 **Rev 4 in one paragraph.** Josh (2026-10-28): keep nuketown unchanged except for critical compatibility, and forgo most security hardening in v1, because the input is almost always the user typing into a textbox and a rogue plugin is the same risk as `curl | bash`. So v1 keeps the user-visible promise of V4/V5 (every switch is a card the human approves; a reviewer agent writes the summary; watchdog and rollback) and drops the machinery that defended it against a compromised resident: the request ledger, human-signed approval merges, nonces, the deterministic facts engine, the preflight VM, the reviewer sandbox and every nuketown change. Nothing is deleted: each dropped mechanism has a short entry in **Appendix H** pointing at its rev 3 section. Rev 3 is in git history and in `scratchpad/DESIGN.rev3.md`; the cut is listed in `v1-cut-changelog.md`.
 
 **Rev 5 in one paragraph.** Josh (2026-10-28, later): the root switch daemon was rev 3 machinery doing a sudoers rule's job, and it covered only switching. Rev 5 drops `loom-switchd`. The resident switches with `sudo loom-switch <result>` through nuketown's approval sudo, mino-style: a short list of commands it may ask for, each approved by the human. **Every approval, not just switches, gets a reviewer analysis**: the root-side wrapper snapshots any script the command runs, the reviewer resident explains in plain English what will happen and what it can't see, and the card (Quickshell on omanix, zenity elsewhere) shows that above the raw command. A switch is the same request with a richer card (nvd and git diff computed by root). So nuketown changes in v1 (§a.3 K1–K10): the `sudoex-run`, `SETENV` and request-line bypasses are fixed, and a swappable prompter, request kinds, an approval list and the approval reviewer are new options that default off, so signi keeps today's dialog plus the fixes. Rev 4 is in `scratchpad/DESIGN.rev4.md`; the changes are in `v1-cut-changelog.md` (rev 5 section).
 
-**Inputs.**
+**Rev 5.1 in one paragraph.** Josh (2026-10-28, later still): instead of a root wrapper, an unprivileged **`nuketown-approval` service user** does the request work and reaches root only through `sudo`, so every privileged step it takes is logged by sudo and root itself only runs the approved command. This is **built** (W1, nuketown `6b4960c`, `eafb45f`, `6b9e5c1` on top of `7a2b84e`): agents' only sudo rule starts `nuketown-approve` as that user; it snapshots scripts by reading them *as the requester*, runs the reviewer with a timeout before asking, talks to the broker (whose socket group now holds only the service user), runs the command, and writes a journal record and an audit copy. §a.3, §c.3, §g.1, §g.3, §g.4, §i and W1 describe what was built; request kinds (K7), human/timer requesters (`--requester`) and `NUKETOWN_APPROVAL_DIR` are still to build (W1b, needed by W8). Rev 5 is in `scratchpad/DESIGN.rev5.md`; changes are in `v1-cut-changelog.md` (rev 5.1).
+
+**Inputs.****Inputs.**
 - `spec.md` rev 16. It is authoritative for **install scope and the excluded vectors** (below) and overrides this document on those points. Its "Agent security" clauses are **superseded by V4/V7**: every switch needs the human's approval on a card (no agent-only path, no protected-set gate); the "one approval gesture: the existing GUI sudo dialog" is kept literally, as nuketown's approval dialog (§g.3).
 - `design/facts.md` (toolchain facts, verified 2026-10-27).
 - Josh's direction V1–V8 and the standing decisions D1–D12.
@@ -46,7 +48,7 @@ Rev 5, 2026-10-28 (v1 scope cut; reviewed sudo). Authors: Ada, with Joshua Perry
 | H5 | **Every switch, and every root command the resident asks for, goes through a card the human approves** (nuketown approval, drawn by omanix's card; §g.3). There are no tiers and no agent-only path. The watchdog's automatic rollback is the only activation without an approval, and it only restores the generation that was already running. | V4. One rule is easy to explain and test. |
 | H6 | The resident can edit **anything** in the host repo. Its key can push only `gate/*` and `refs/dit/*` on silo, never `master` or tags, because it is never in `CODEOWNERS` (§g.7). | V4, D6. silo's existing CODEOWNERS behaviour gives this for free. |
 | H7 | **No switch daemon. `loom-switch <out>` is a root script the resident runs through approval sudo.** The resident builds as itself. Before the card, loom's request-kind collector (root) fetches the proposal bundle into the root mirror and computes the git diff, the flags and `nvd diff /run/current-system <out>`; after approval `loom-switch` activates exactly `<out>`. | V8. A privileged service was more complex than a sudoers entry and covered only one escalation. The diffs on the card are computed by root, not taken from the agent. |
-| H8 | **The reviewer is an ordinary second nuketown resident** (`reviewer`, uid 1101) that root runs once per approval request (`systemd-run --uid`, `claude -p`, no session memory). It explains what will run; if it is signed out, slow or fails, the card shows the raw request with "No AI review". | V5, V8, without a sandbox (Appendix H.5). |
+| H8 | **The reviewer is an ordinary second nuketown resident** (`reviewer`, uid 1101) that the `nuketown-approval` service user runs once per approval request (`sudo -H -u reviewer`, `claude -p`, no session memory). It explains what will run; if it is signed out, slow or fails, the card shows the raw request with "No AI review". | V5, V8, without a sandbox (Appendix H.5). |
 | H9 | **Approval is nuketown's broker with a swappable prompter.** A request is a root-written directory (argv as JSON, script snapshots, collector files, review); the broker hands it to the prompter. omanix's prompter is the `omanix.approval` card; zenity is nuketown's default (§a.3 K6). | One approval surface; signi keeps zenity. |
 | H10 | **Watchdog and rollback by default.** `loom-switch` arms a dead-man rollback from the old generation before `switch-to-configuration test`, runs health checks, and only then makes the new generation the boot default (§g.5). | The spec's switch watchdog. A broken generation can't disable its own rollback. |
 | H11 | (retired: rev 3's switchd pipeline steps; Appendix H.4) | — |
@@ -173,36 +175,42 @@ loom/
 
 **Removed:** `installer.nix` (dead code); the inline Python auth server and QR credential handoff; the `MOCK_APPROVED` runtime file; the `wheelNeedsPassword=false` default; the hardcoded Hyprland prompt snippets (loom `prompt.nix`'s live-tuning idea survives as `omanix try`, §h.6). From rev 2: `lib/settings.nix`, `lib/json-schema.nix`, `lib/policy-view.nix`, `modules/loom/{settings,policy}.nix`, `loom policy classify`. From rev 3 (V7): `lib/highlight/`, `loom-facts`, `loom-chatd`, `loom-eval`, `loom-fetch`, `loom-egress`, `loom-card-tty` and their schemas (Appendix H). From rev 4 (V8): `loom-switchd`, its socket, the `loom-switch` group and `loom approve`; `loom-review` (the run moved into nuketown's approval reviewer, K5).
 
-### a.3 nuketown: approval changes (K1–K10) and compatibility (C1–C8)
+### a.3 nuketown: approval changes (K1–K12) and compatibility (C1–C8)
 
-V7 kept nuketown unchanged; V8 changes its approval path, because every approval now carries a review and the resident's sudo is the switch path. Everything new defaults off, so signi keeps today's zenity dialog and gains only the fixes K1–K3 (`checks.signi-compat`, K10). Checked against `~/projects/nuketown` HEAD (`module.nix`, `approval-daemon.nix`).
+V7 kept nuketown unchanged; V8 changes its approval path, because every approval now carries a review and the resident's sudo is the switch path. Everything new defaults off except the bypass fixes and the service user, so signi keeps the zenity dialog (now with the request rendered from `request.json`, a **Show files** button, and "No reviewer configured") (`checks.signi-compat`, K10). **Built** on nuketown `master` (`7a2b84e`, `6b4960c`, `eafb45f`, `6b9e5c1`; not pushed beyond `7a2b84e`), except K7 and the items marked W1b.
 
 **nuketown changes in v1.**
 
-| # | Change | Why |
-|---|---|---|
-| K1 | **`sudoex-run` becomes a root-side approval wrapper.** The agent-side `sudoex` no longer talks to the broker; it runs `sudo sudoex-run [--decrypt src:dest] [--why …] -- cmd…`, and `sudoex-run` (root) asks the broker itself, like `sudo-with-approval`. Rev 3's N1, without the token. | Today `sudoex-run` is NOPASSWD `exec "$@"`: any agent with default sudo rules gets root with no dialog (`sudo sudoex-run bash`), on signi too. |
-| K2 | **`SETENV` is dropped** from every agent sudoers rule. | With `SETENV`, `sudo BASH_ENV=/tmp/x sudo-with-approval true` runs agent code as root before the approval is asked (variables set on the sudo command line skip `env_delete`). |
-| K3 | **A request is a root-written directory, not a text line.** Both wrappers go through one root entry point, `nuketown-approve-run [--requester <name>] [--why <text>] [--decrypt src:dest] -- argv…`, which writes `/run/nuketown-approval/<id>/request.json` (argv as a JSON array, requester, uid, cwd, why, kind) and sends the broker only `REQUEST:<id>` (plus `DECRYPT:` lines). The legacy `user:command` line is removed. | A newline in the command could split the line protocol so the dialog showed something other than what runs. The id is chosen by root; argv never crosses the socket. |
-| K4 | **Script snapshots.** `nuketown-approve-run` copies into `<id>/files/` every argv element that names a regular file outside `/nix/store` (relative to the requester's cwd), records sha256 and size, and **runs the snapshot** in place of the original when that file is the program: `argv[0]`, or the first non-option argument after an interpreter (`bash sh dash zsh fish python python3 perl ruby node lua nu`). Other file arguments are snapshotted for review only and marked "read at run time". | Josh: a scratchpad script that does several things in one sudo is hard to audit. What runs is what was reviewed. |
-| K5 | **Approval reviewer** (`nuketown.approval.reviewer.*`, default off). For each request root starts the reviewer agent in the background (`systemd-run --uid`, §g.4) on a read-only view of the request directory, and writes its parsed output to `<id>/review.json` (`review.status`: `pending` \| `ok` \| `failed:<reason>`). It never blocks or decides the approval. | The review is adversarial and in plain English (§g.4). |
-| K6 | **Swappable prompter** (`nuketown.approvalDaemon.prompter`, HM, default null = built-in zenity). The broker runs `<prompter> <request dir>`; the first stdout line is `APPROVED` or `DENIED`, an optional reason follows and is printed on the requester's stderr. The built-in zenity prompter waits up to `reviewer.promptDelay` for the review, shows it above the command, and has a **Details** button (`--extra-button`) for argv and snapshot contents. DECRYPT flows keep the built-in YubiKey dialog. | omanix draws the card in Quickshell; signi keeps zenity. |
-| K7 | **Request kinds** (`nuketown.approval.kinds.<name> = { command; collect; reviewPrompt; timeout; }`). When the resolved `argv[0]` equals `command`, root runs `collect <request dir> -- argv…` before the review; a non-zero exit refuses the request with the collector's message and no dialog. Prompter and reviewer see `kind` and the collector's files. | A switch is a richer request (nvd, git diff) on the same path, with no daemon. |
-| K8 | **Per-agent approval list** (`nuketown.agents.<n>.sudo.approvalAllow`, `nullOr (listOf str)`, default null = any command). A command not on the list is refused before any dialog. | Mino-style: a short list instead of "anything with approval". |
-| K9 | The agent sudo shim accepts `--why <text>` and passes it to the wrapper; the card shows it as "ada's stated reason", and the reviewer checks the command against it. | The reason is context, not trust. |
-| K10 | `checks.signi-compat` (rev 3's N6): a fixture mirroring mynix signi evaluates; its sudoers differ only by K2, its broker only by K3 with the default prompter. | signi deploys the same nuketown. |
+| # | Change | Why | State |
+|---|---|---|---|
+| K1 | **No agent sudo rule reaches root.** The `sudo` shim, `sudoex` and `sops-unlock` run `sudo -u nuketown-approval /run/current-system/sw/bin/nuketown-approve [--decrypt src:dest]… [--why …] [--user u] [--group g] [--login] [--shell] [--set-home] --cwd "$PWD" -- argv…`; that is each sudo agent's only rule (NOPASSWD). `sudo-with-approval` and `sudoex-run` are gone. | `sudoex-run` was NOPASSWD `exec "$@"`: any agent with default rules got root with no dialog, on signi too. Fixed first in `7a2b84e` (root-side wrapper), then replaced by the service user. | built |
+| K2 | **No `SETENV`** on any agent or service-user rule. | With `SETENV`, `sudo BASH_ENV=/tmp/x sudo-with-approval true` ran agent code as root before approval (confirmed in a VM on the old code). | built |
+| K3 | **A request is a directory written by the service user, not a text line.** `nuketown-approve` writes `/run/nuketown-approval/<id>/request.json` (argv as a JSON array, `display` = argv `%q`-quoted on one line, requester from sudo's `SUDO_USER`, run-as, cwd, why, decrypt) and sends the broker only `REQUEST:<id>` (plus `DECRYPT:` lines). `SUDO:`/legacy lines are gone; the broker rejects unknown operations and ids that don't name a request directory. | A newline in an argument could add a second request line, so the dialog showed something other than what ran (confirmed in a VM). The id is chosen by the service user; argv never crosses the socket. | built |
+| K4 | **Script snapshots, read as the requester.** The program (`argv[0]` outside `/nix/store` and `/run/wrappers`), or the first non-option argument after an interpreter (`bash sh dash zsh ksh fish python python3* perl node ruby lua*`; `-c`/`-e`/`-m`/`-` mean inline code, no file), is read with `sudo -u <requester> nuketown-approval-read <path>` (regular file, ≤ `snapshotMaxBytes`, default 1 MiB), stored as `snapshots/<n>/<basename>` with its sha256, and **runs in place of the original**. If it can't be read *by the requester*, the request is refused before asking. Up to 8 other path-like arguments are snapshotted for review only. | Josh: a scratchpad script that does several things in one sudo is hard to audit. What runs is what was reviewed, and the service user never reads a file the agent couldn't. | built |
+| K5 | **Approval reviewer** (`nuketown.approval.reviewer.{enable,agent,command,timeout}`, default off). Before asking, the service user runs `timeout <timeout> sudo -H -u <agent> <command> <request dir>` (default command: `claude -p` with a fixed adversarial prompt and the request inlined; default timeout 45 s), validates the JSON it prints and writes `review.json` (`status`: `ok` \| `unavailable` with a reason \| `disabled`). The service user parses the output, unprivileged; root never sees it. | The review is adversarial and in plain English (§g.4). | built (synchronous; the "card fills in later" mode of rev 5 is W1b) |
+| K6 | **Swappable prompter** (`nuketown.approvalDaemon.prompter`, HM, default null = built-in zenity). The broker runs `<prompter> <request dir>`; exit 0 approves, anything else denies. With a custom prompter a `--decrypt` runs after approval (one YubiKey touch). The built-in zenity prompter renders `request.json`/`review.json` (Pango-escaped) with a **Show files** button (`--extra-button`) for the snapshots; DECRYPT + REQUEST keeps the combined YubiKey dialog. | omanix draws the card in Quickshell; signi keeps zenity. | built (a deny reason on the requester's stderr is W1b) |
+| K7 | **Request kinds** (`nuketown.approval.kinds.<name> = { command; collect; reviewPrompt; timeout; }`): a collector runs before the review when the resolved `argv[0]` matches; non-zero refuses with its message. | A switch is a richer request (nvd, git diff) on the same path, with no daemon. | **W1b** |
+| K8 | **Per-agent approval list** (`nuketown.agents.<n>.sudo.approvalAllow`, `nullOr (listOf str)`, default null = any command; entries are absolute paths or names resolved in the system PATH, compared as resolved paths, not realpaths, because coreutils is one binary). Refused before asking. `sudo.commands` is a deprecated alias. | Mino-style: a short list instead of "anything with approval". | built |
+| K9 | The shim accepts `--why <text>`; the card shows it as the agent's stated reason and the reviewer checks the command against it. | The reason is context, not trust. | built |
+| K10 | `checks.signi-compat`: a fixture with signi's nuketown options forces the system to evaluate; mynix signi also evaluates against this nuketown with `--override-input` (not committed or switched). | signi deploys the same nuketown. | built |
+| K11 | **The `nuketown-approval` service user** (system user, no home, nologin; groups `nuketown-approval`, `nuketown-broker`). Its one sudo rule is `ALL=(ALL:ALL) NOPASSWD: ALL`: it is root-equivalent by design, and the value is that each step (snapshot reads as the requester, the review as the reviewer, the approved command) is a logged sudo call and it parses everything unprivileged. Agents are no longer in `nuketown-broker`. | Josh: log invocations; root does no parsing. | built |
+| K12 | **Audit.** One journal record per request (`journalctl -t nuketown-approval`, JSON: id, requester, argv, exec_argv, snapshot hashes, review status/risk/recommendation, decision, prompter, exit code), and the finished request directory copied to `nuketown.approval.audit.dir` (default `/var/lib/nuketown-approval`, persisted, pruned daily after `audit.keepDays`, default 30). | An after-the-fact record of what ran and why. | built |
 
-The request directory (`/run/nuketown-approval/<id>/`, `root:nuketown-approval 0750`; the group holds `humanUser` and the reviewer agent; tmpfiles removes it after a day):
+W1b (still to build, needed by W8): K7; `--requester <name>` accepted only when the caller is root (for `loom-switch-request` and timers); `NUKETOWN_APPROVAL_DIR` for the approved command; a deny reason from the prompter to the requester's stderr; showing the prompter before the review finishes.
+
+The request directory (`/run/nuketown-approval/<id>/`, `nuketown-approval:nuketown-approval-read`, setgid `2751`; the group holds `humanUser` and the reviewer agent; removed when the request ends, after the audit copy):
 
 ```
-request.json    { id, kind, requester, uid, cwd, why, argv: [...], argvRun: [...], decrypt?, created }
-files/<i>-<basename>   snapshots (mode kept for the program); files.json [{ arg, orig, snapshot, sha256, bytes, runs }]
-kind/           collector output (switch: card.json, nvd.txt, diff.patch, stat.txt, request.txt)
-review.status   review.json     written by root from the reviewer's stdout
-decision        approved | denied[: reason]   written by root after the broker answers
+request.json    { id, requester, time, cwd, why, run_as: {user, group, login, shell, set_home},
+                  argv: [...], exec_argv: [...], display, decrypt: [...],
+                  snapshots: [{ path, snapshot, sha256, executed }] }
+snapshots/<n>/<basename>   0755 if it runs, 0644 if review only
+review.json     { status: ok, summary, risk, recommendation, notes, not_shown } | { status: unavailable, reason } | { status: disabled }
+review.stderr
+decision.json   the audit record (also in the journal)
 ```
 
-The approved command runs with `NUKETOWN_APPROVAL_DIR=<dir>`, so a kind's command (`loom-switch`) can record the card and the review.
+The approved command runs as `sudo [-u/-g/-H/-i/-s] -- nuketown-run-in <cwd> <exec_argv…>` (cwd of the request, `/` if the run-as user can't enter it; system PATH), with stdio and the exit code passed through to the agent.
 
 **loom-side compatibility.** Each row is something a fresh loom host needs from nuketown and how loom gets it with configuration:
 
@@ -211,11 +219,11 @@ The approved command runs with `NUKETOWN_APPROVAL_DIR=<dir>`, so a kind's comman
 | C1 | Agent persistence under `/persist` | nuketown writes `environment.persistence."/persist".users.<agent>` unconditionally (hard-coded root) | loom's persist root is `/persist` and loom always imports impermanence. `loom.persist.root` is asserted equal to `"/persist"` while nuketown is enabled (rev 3's N5 `persistRoot` deferred). |
 | C2 | `/agents` mount and per-boot reset | nuketown mounts `@agents` itself from `nuketown.btrfsDevice` (a btrfs **filesystem UUID**) and rolls it back in initrd after `cryptsetup.target` | loom's disko layout creates `@agents` and `@agents-blank` but **declares no mount for `/agents`** (nuketown's `fileSystems./agents` would conflict). The installer reads the btrfs UUID inside LUKS and writes `nuketown.btrfsDevice` into `machine.nix`. A nested subvolume inside `@agents` would make nuketown's plain `btrfs subvolume delete` fail; nothing omanix runs creates one (N5's nested delete deferred). |
 | C3 | Agent ssh key from sops | nuketown reads every agent secret from one `nuketown.sopsFile` | loom sets `nuketown.sopsFile = <host>/secrets/agents.yaml` (one file, not rev 3's per-agent files) and `agents.ada.secrets.sshKey = "ada/ssh"`. sops-nix's key is loom's host age key (`sops.age.keyFile`), independent of nuketown. |
-| C4 | The approval dialog | nuketown's broker is a **home-manager** user unit (`nuketown.homeManagerModules.approvalDaemon`); the socket directory `/run/nuketown-broker` and group `nuketown-broker` exist only when some agent has `sudo.enable` | loom imports the HM module into the human's HM config and enables it (the one HM `systemd.user` unit omanix allows, §f.4.5) and sets `nuketown.humanUser`. The resident always has `sudo.enable` (C8), so nuketown creates the socket directory and group; omanix sets the prompter (K6). |
+| C4 | The approval dialog | nuketown's broker is a **home-manager** user unit (`nuketown.homeManagerModules.approvalDaemon`); the socket directory `/run/nuketown-broker`, group `nuketown-broker` and the `nuketown-approval` service user exist only when some agent has `sudo.enable` | loom imports the HM module into the human's HM config and enables it (the one HM `systemd.user` unit omanix allows, §f.4.5) and sets `nuketown.humanUser`. The resident always has `sudo.enable` (C8), so nuketown creates the socket directory, group and service user; omanix sets the prompter (K6). |
 | C5 | The dialog appears under Hyprland/uwsm | the broker unit sets only `DISPLAY=:0` and may start before the session imports `WAYLAND_DISPLAY` | Works on signi (Hyprland) today. omanix's autostart runs `systemctl --user restart nuketown-broker` after uwsm imports the session environment. UNVERIFIED under uwsm (U37). |
 | C6 | Option docs for the catalog | nuketown's `portal.command` default references `pkgs.unstable.claude-code`; `nixosOptionsDoc` evaluates defaults | loom adds an overlay alias `unstable = final` on the unstable channel (and a real unstable on the 26.05 CI leg), so catalogs build (U40). |
 | C7 | Agent sign-in terminal | the human reaches an agent with `machinectl shell <agent>@`, which nuketown's polkit rule allows only when some agent has `portal.enable` | loom sets `portal.enable = true` for the resident and the reviewer, with `portal.command` = the harness. The sign-in terminal runs `machinectl shell <agent>@ <loginCommand>` (§h.3.6). |
-| C8 | The resident's sudo | `sudo.enable` with default `sudo.commands` grants the two wrapper rules; before K1/K2 that was password-less root | loom leaves `sudo.commands` at its default (safe after K1, K2) and sets `sudo.approvalAllow` from `loom.agent.sudoCommands`, or null when `loom.agent.sudo = "any"` (D8, K8). |
+| C8 | The resident's sudo | `sudo.enable` gives the agent one rule: start `nuketown-approve` as the service user (K1) | loom sets `sudo.enable = true` and `sudo.approvalAllow` from `loom.agent.sudoCommands`, or null when `loom.agent.sudo = "any"` (D8, K8). |
 
 **Still deferred** (Appendix H.1): N2 Python broker with `SO_PEERCRED`, N3 build-time mock approval, N4 key cleanup trap, N5 option additions other than K6's prompter, N8 egress, N9 `interactive = false`, N10 claude-code lockdown, N11 `SIGN`, N12 `switch.command`, N13 `homeMode`, N14 host-shell target restriction, N15 NixOS broker unit.
 
@@ -457,7 +465,7 @@ loom.reviewer.harness                      enum ["claude-code" "replay"] "claude
 loom.reviewer.loginCommand                 str (claude-code: "claude" then /login)
 loom.reviewer.model                        nullOr str null   (null = harness default; a separate login from the resident)
 loom.reviewer.timeout                      int 180      (→ nuketown.approval.reviewer.timeout)
-loom.reviewer.promptDelay                  int 20       (zenity waits this long for the review; the omanix card shows at once)
+loom.reviewer.promptDelay                  int 20       (W1b: show the card before the review lands; v1 as built waits up to loom.reviewer.timeout)
 
 loom.firstboot.steps.<name>                { order; description; command; interactive; doneWhen; }
 loom.hardware.facts                        typed submodule from hardware.json
@@ -542,9 +550,9 @@ nuketown = {
   approval.reviewer = {                                                # K5
     enable = cfg.reviewer.enable;
     agent = cfg.reviewer.name;
-    inherit (cfg.reviewer) timeout promptDelay;
+    inherit (cfg.reviewer) timeout;                                    # command = null: nuketown's claude -p reviewer
   };
-  approval.kinds.loom-switch = {                                       # K7, §g.3
+  approval.kinds.loom-switch = {                                       # K7 (W1b), §g.3
     command = "/run/current-system/sw/bin/loom-switch";
     collect = "${pkgs.loom-switch}/libexec/loom-switch-collect";
     reviewPrompt = "${pkgs.loom-switch-review}/prompt.md";
@@ -557,7 +565,7 @@ home-manager.users.${config.loom.user.name} = {             # C4: the broker is 
 };
 nuketown.agents.${cfg.agent.name} = {          # resident, default "ada", uid 1100
   enable = cfg.agent.enable; uid = cfg.agent.uid; role = "software";
-  sudo.enable = true;                                                  # C8: the default wrapper rules
+  sudo.enable = true;                                                  # C8: only "start nuketown-approve as nuketown-approval"
   sudo.approvalAllow = if cfg.agent.sudo == "any" then null else cfg.agent.sudoCommands;   # K8, D8
   persist.directories = [ "projects" ".claude" ];
   secrets.sshKey = "${cfg.agent.name}/ssh";
@@ -1620,9 +1628,10 @@ This section is the path from something the human asks for to a switched generat
 
 | Principal | Unix identity | Holds | Can | Cannot |
 |---|---|---|---|---|
-| human | `<user>`, uid 1000, wheel (sudo with password), group `nuketown-approval` | human ssh key(s): FIDO2 token, or `~/.ssh/id_ed25519` with a passphrase (D10); the SEK on paper | chat, approve or deny cards, edit the repo in a terminal, `loom propose`, `sudo` | — |
+| human | `<user>`, uid 1000, wheel (sudo with password), group `nuketown-approval-read` | human ssh key(s): FIDO2 token, or `~/.ssh/id_ed25519` with a passphrase (D10); the SEK on paper | chat, approve or deny cards, edit the repo in a terminal, `loom propose`, `sudo` | — |
 | resident | `ada`, uid 1100 (`loom.agent.name`) | agent ssh key (sops → `/agents/ada/.ssh/id_ed25519`); its own model login | edit its working copy `~/projects/host`, commit, build, `loom propose`, push `gate/*` and `refs/dit/*`, chat, read `runtime.json`; **ask** for `sudo` on its list (D8: any command) | read the human's home (0700), push `master` (not in CODEOWNERS), run anything as root without an approved card |
-| reviewer | `reviewer`, uid 1101, group `nuketown-approval` | its own model login (`/agents/reviewer/.claude`, persisted) | read request directories, print a review | push anywhere (no key), sudo, approve |
+| approval service | `nuketown-approval` (system user, groups `nuketown-approval`, `nuketown-broker`) | nothing of its own | write request directories, read files *as the requester*, run the reviewer, ask the broker, run approved commands; each step a logged `sudo` call (K11) | be started by anyone but a sudo agent (or root, W1b) |
+| reviewer | `reviewer`, uid 1101, group `nuketown-approval-read` | its own model login (`/agents/reviewer/.claude`, persisted) | read request directories, print a review | push anywhere (no key), sudo, approve |
 | host | root; ssh host key `/persist/etc/ssh` | host ssh + age keys, the mirror `/persist/var/lib/loom/host`, switch records | run `loom-switch` after an approval, push `master` after a promoted switch, make update and maintenance commits | — |
 
 ### g.2 Chat and the request
@@ -1643,10 +1652,11 @@ Rev 3's root-held request ledger, `SO_PEERCRED` attribution, paste and agent-cho
 
 ```
 any root command:
-  resident: sudo [--why "…"] <cmd…> ─► nuketown shim ─► sudo sudo-with-approval ─► nuketown-approve-run (root)
-     approval list (K8) → request dir + snapshots (K3, K4) → kind collector, if any (K7)
-     → reviewer in the background (K5) → broker REQUEST:<id> → prompter (omanix card | zenity) → Approve / Deny
-     Approve ─► run argvRun as root (snapshots in place of scripts)    Deny ─► "Denied: <reason>" on the resident's stderr
+  resident: sudo [--why "…"] <cmd…> ─► nuketown shim ─► sudo -u nuketown-approval nuketown-approve
+     approval list (K8) → request dir + snapshots read as the requester (K3, K4) → kind collector, if any (K7, W1b)
+     → reviewer, up to its timeout (K5) → broker REQUEST:<id> → prompter (omanix card | zenity) → Approve / Deny
+     Approve ─► sudo <exec_argv> (snapshots in place of scripts; logged)    Deny ─► "Request denied." on the resident's stderr
+     → journal record + audit copy (K12)
 
 a switch is the same request, kind loom-switch:
   resident: edit ~/projects/host, omanix check, commit
@@ -1656,11 +1666,11 @@ a switch is the same request, kind loom-switch:
 ```
 
 **Every request.**
-1. **Admission.** `nuketown-approve-run` refuses (exit 1, no dialog) a command that is not on the agent's approval list (K8): "not in ada's approval list; ask Josh to run it or to add it".
+1. **Admission.** `nuketown-approve` refuses (exit 1, no dialog) a command that is not on the agent's approval list (K8): "not in ada's approval list; ask Josh to run it or to add it".
 2. **Request directory and snapshots** (K3, K4). The resident sees on stderr which files were snapshotted and that the snapshot is what will run.
-3. **Review** (§g.4) starts in the background. It is skipped when the reviewer is disabled or signed out, and when the requester is the human.
-4. **Ask.** The broker hands the directory to the prompter. omanix's card appears at once with "Reviewing…" and fills in when `review.json` lands; zenity waits up to `promptDelay` (20 s) first. Nothing is ever approved by itself: a generic request times out after 60 s as **Deny**; a kind sets its own timeout (`loom-switch`: none, the request lives while `loom propose` waits).
-5. **Run.** On Approve root writes `decision` and runs `argvRun` with the requester's cwd and a reset environment. On Deny the reason, if any, goes to the requester's stderr; the resident's harness shows it as Josh's reply.
+3. **Review** (§g.4) runs before the ask, for at most `reviewer.timeout`. It is skipped when the reviewer is disabled (and, W1b, when the requester is the human). A timeout, failure or bad output gives `status = unavailable` and the ask goes ahead.
+4. **Ask.** The broker hands the directory to the prompter. As built, the card appears once the review is in (or unavailable); W1b lets omanix's card appear at once with "Reviewing…". Nothing is ever approved by itself: the zenity prompter times out after 120 s as **Deny**; a kind sets its own timeout (W1b; `loom-switch`: none, the request lives while `loom propose` waits).
+5. **Run.** On Approve the service user runs `exec_argv` through sudo in the requester's cwd with the system PATH and a reset environment, passing stdio and the exit code back; then it writes the journal record and the audit copy (K12). On Deny the requester sees "Request denied." (W1b: plus the prompter's reason, which the resident's harness shows as Josh's reply).
 
 **Switches** (`loom propose`, `loom-switch`).
 1. **Propose** (resident or human). `loom propose [--ref <rev>] [--request <text>]` builds `nixosConfigurations.host` of the commit through nix-daemon (pure eval, no IFD, substituters from the running `nix.settings`), writes `<dir>/{host.bundle,request.txt,tip}` (bundle = `deployed..tip`), pushes `gate/<topic>` to silo with the agent key, then runs `sudo --why "<request>" loom-switch --proposal <dir> <out>`. An eval or build failure goes back verbatim (exit 1), with no card. The resident runs `loom propose` as a background command and is told the outcome when it ends. One proposal at a time: a newer one makes the pending request deny itself ("superseded").
@@ -1668,37 +1678,35 @@ a switch is the same request, kind loom-switch:
 3. **Review** with loom's switch prompt (§g.4); skipped when the requester is the human, for undo to a previously switched tree, and for signed-release-only updates.
 4. **Ask** as above; the omanix card draws `kind = loom-switch` as the change card (§h.4).
 5. **Activate** (§g.5) exactly `<out>`, under `/run/loom/switch.lock`.
-6. **Record.** `/persist/var/lib/loom/switches/<n>/{card.json,review.json,nvd.txt,tip,out}`, copied from `NUKETOWN_APPROVAL_DIR`; denied change cards go to `switches/denied/`.
+6. **Record.** `/persist/var/lib/loom/switches/<n>/{card.json,review.json,nvd.txt,tip,out}`, copied from `NUKETOWN_APPROVAL_DIR` (W1b); denied change cards go to `switches/denied/`. nuketown's own audit copy (K12) holds every request regardless.
 
 **Humans and timers.**
-- The human's `loom propose` (and the no-agent panel's **Apply**) ends in `pkexec loom-switch-request …`. The polkit action `farm.loom.propose` is `yes` only for the human user in an active local session and `auth_admin` otherwise; `loom-switch-request` calls `nuketown-approve-run --requester <human> -- loom-switch …`, so the human gets the same card, without a review. Over ssh with no session, `sudo loom-switch --proposal <dir> <out>` with the human's password is the approval.
-- Root timers (`loom-update`) call `nuketown-approve-run --requester loom-update -- loom-switch …` directly.
+- The human's `loom propose` (and the no-agent panel's **Apply**) ends in `pkexec loom-switch-request …`. The polkit action `farm.loom.propose` is `yes` only for the human user in an active local session and `auth_admin` otherwise; `loom-switch-request` (root) calls `sudo -u nuketown-approval nuketown-approve --requester <human> -- loom-switch …` (W1b), so the human gets the same card, without a review. Over ssh with no session, `sudo loom-switch --proposal <dir> <out>` with the human's password is the approval.
+- Root timers (`loom-update`) call `sudo -u nuketown-approval nuketown-approve --requester loom-update -- loom-switch …` (W1b).
 
 **Silo master.** After a promoted switch `loom-switch` pushes `master` with the host key. If silo's `master` is not an ancestor of the new commit (a human pushed directly from elsewhere), it first pushes the old silo tip to `gate/diverged/<sha>`, then updates `master`, and the next card notes it.
 
 ### g.4 Card and reviewer
 
-**Reviewer run** (K5). Root runs, in the background,
+**Reviewer run** (K5, built). The service user runs, before asking,
 
 ```
-systemd-run --wait --pipe --collect --uid=reviewer --unit=nuketown-review-<id> -p RuntimeMaxSec=<timeout> \
-  -p ReadOnlyPaths=/run/nuketown-approval/<id> --setenv=HOME=/agents/reviewer \
-  nuketown-review /run/nuketown-approval/<id>
+timeout --kill-after=5 <reviewer.timeout> sudo -H -u reviewer -- <reviewer.command> /run/nuketown-approval/<id>  < /dev/null
 ```
 
-`nuketown-review` (from the running generation) builds the prompt from `request.json`, `files.json`, the snapshot contents (each capped at 256 kB; larger files are "not shown") and `kind/`, appends the kind's `reviewPrompt`, and runs `claude -p --output-format json` as the reviewer. The base prompt is adversarial: assume the command may be wrong or hostile; say step by step, in plain English, what it will do as root, citing script line numbers; name everything it cannot see (files sourced or read at run time, network fetches, commands built at run time, files over the cap); compare it with the stated reason. Output:
+The default command builds the prompt from nuketown's fixed adversarial prompt, `request.json` and each snapshot (capped at 200 kB in the prompt), runs `claude -p --output-format text` as the reviewer, and prints the JSON object it finds. The prompt: assume the agent may be mistaken or compromised; say concretely, step by step, what the command and every script will do; flag anything beyond the stated reason, anything that persists (users, keys, services, sudoers, ssh, shell rc files), sends data off the machine or destroys data; list what it can't see (files sourced or read at run time, downloads, scripts that find siblings via `$0`, which now point into the snapshot directory). Output, validated by the service user (summary ≤ 2000 chars, ≤ 20 notes of ≤ 500 chars):
 
 ```jsonc
-{ "oneLine": "Restarts Wi-Fi and deletes all saved networks",   // ≤ 80 chars
-  "explanation": "…",                                            // ≤ 1200 chars, plain text, numbered steps
-  "cannotSee": [ "line 4 runs ~/bin/fixwifi, which wasn't snapshotted" ],   // ≤ 5
-  "matchesReason": "yes|partly|no|no-reason",
+{ "summary": "Restarts Wi-Fi and deletes all saved networks. …",   // 2-5 plain sentences
   "risk": "low|medium|high",
-  "concerns": [ "≤ 200 chars" ],                                 // ≤ 5
-  "recommendation": "approve|look-closer|deny" }
+  "recommendation": "approve|deny|ask",
+  "notes": [ "line 4 deletes /var/lib/iwd/*.psk, which the reason didn't mention" ],
+  "not_shown": [ "line 6 runs ~/bin/fixwifi, which wasn't snapshotted" ] }
 ```
 
-loom's switch prompt adds: compare the git diff and the nvd diff with the request, and say plainly anything the request didn't ask for. Invalid output, a timeout or a signed-out reviewer give `review.status = failed:<reason>` → "No AI review (<reason>)". All review text is rendered as plain text.
+A loom kind (W1b) can replace the prompt; the review the card shows is the same object.
+
+loom's switch prompt adds: compare the git diff and the nvd diff with the request, and say plainly anything the request didn't ask for. Invalid output, a timeout or a signed-out reviewer give `review.json = {status: "unavailable", reason}` → "No review: <reason>". All review text is rendered as plain text.
 
 **Change card** (`kind/card.json`, written by the collector; the prompter merges `review.json`):
 
@@ -1713,9 +1721,9 @@ loom's switch prompt adds: compare the git diff and the nvd diff with the reques
   "full": false }
 ```
 
-**Form.** A change card is routine (one line, §h.4) when the reviewer said `approve` with `matchesReason = yes`, there are no `flags`, and there is a request; or for an undo or a release-only update. Everything else uses the full form. Root-command cards have one form (§h.4). This is a display choice, not a security property.
+**Form.** A change card is routine (one line, §h.4) when the reviewer said `approve` with `risk = low` and no `notes`, there are no `flags`, and there is a request; or for an undo or a release-only update. Everything else uses the full form. Root-command cards have one form (§h.4). This is a display choice, not a security property.
 
-**Zenity fallback** (signi, or no Quickshell): the built-in prompter shows `oneLine`, `explanation`, risk and recommendation above the command, and **Details** shows argv and the snapshots; for a change card it shows title, packages and flags.
+**Zenity fallback** (signi, or no Quickshell; built): the built-in prompter shows the requester, run-as user, the quoted command, the agent's stated reason, the snapshotted files, then the reviewer's risk, recommendation, summary, concerns and what it couldn't verify (or "No review: <reason>" / "No reviewer configured"); **Show files** opens the snapshot contents with their sha256. A change card (W1b, kinds) adds title, packages and flags.
 
 ### g.5 Activation, watchdog, rollback
 
@@ -1745,7 +1753,7 @@ loom's switch prompt adds: compare the git diff and the nvd diff with the reques
 ### g.6 Updates, undo and rollback
 
 **Updates.**
-- `loom-update.timer` (daily, `loom.switch.autoUpdate = "notify"`, the default) runs `nix flake update` for `loom.update.inputs` (default: omanix only) in a scratch worktree. omanix moves only to the newest **signed tag** on its channel (`git verify-tag` against `/etc/loom/release-signers`, D11). It commits as the host (`update: <inputs>`), builds, and requests `loom-switch` through `nuketown-approve-run`. Plugin inputs are bumped only when asked.
+- `loom-update.timer` (daily, `loom.switch.autoUpdate = "notify"`, the default) runs `nix flake update` for `loom.update.inputs` (default: omanix only) in a scratch worktree. omanix moves only to the newest **signed tag** on its channel (`git verify-tag` against `/etc/loom/release-signers`, D11). It commits as the host (`update: <inputs>`), builds, and requests `loom-switch` through `nuketown-approve` (W1b `--requester`). Plugin inputs are bumped only when asked.
 - Card heading **Update ready**; routine one-liner when only signed omanix releases (and nixpkgs through omanix's lock) moved: `Update ready: omanix v0.1.0 → v0.1.1 (signed) · 312 packages upgraded · [Approve] [Details] [Later]`. `[Later]` denies with reason `later`; the timer asks again in 24 h. The reviewer is skipped for it.
 - `"off"` disables the timer. **Nothing auto-switches, ever.** The menu's "Check for updates" runs the timer now; the resident's `omanix update [<input>]` does the same on request.
 - Firmware: the `update` skill reports `fwupdmgr get-updates`; applying is `sudo fwupdmgr update` from the resident's list, approved on a card, or the human running it.
@@ -1980,7 +1988,7 @@ human session (uid 1000)                     root                               
 ────────────────────────                     ────                                     ─────────
 Quickshell omarchy-shell (fork)                                                      ada (1100)  UI agent
   omanix.chat     ── /run/loom/chat/ada.sock ──────────────────────────────────────▶ loom-agent-bridge@ada
-  omanix.approval ◀── omanix-approval-prompt ◀── nuketown broker (HM unit) ◀── REQUEST:<id> ── nuketown-approve-run ◀── sudo (ada)
+  omanix.approval ◀── omanix-approval-prompt ◀── nuketown broker (HM unit) ◀── REQUEST:<id> ── nuketown-approve (nuketown-approval) ◀── sudo (ada)
   omanix.status   (bar dot, pending cards)      reads /run/nuketown-approval/<id>/   │ collector (switch kind)    reviewer (1101)
   omanix.welcome  (first boot, tour)                                                  ▼ loom-switch                systemd-run per request:
                                                                                                                reads the dir, prints JSON
@@ -1989,7 +1997,7 @@ Quickshell omarchy-shell (fork)                                                 
 | Component | Repo | Runs as | Job |
 |---|---|---|---|
 | `loom-agent-bridge@<agent>` | loom | the agent (system unit) | Serves the chat socket, hosts the harness in streaming mode in `~/projects/host`, translates harness events to `loom.chat/v1`, writes attachments to `/agents/<agent>/inbox/`. |
-| `nuketown-approve-run`, `loom-switch` | nuketown, loom | root, per request | §g.3–§g.6. No daemon. |
+| `nuketown-approve`, `loom-switch` | nuketown, loom | `nuketown-approval` per request; `loom-switch` as root via its sudo | §g.3–§g.6. No daemon. |
 | nuketown broker | nuketown (K3, K6) | human HM user unit | Hands each request directory to the prompter (`omanix-approval-prompt`). |
 | `omanix.chat` | omanix (`fork/add`) | human | Panel, composer, transcript, activity rail, chips, attachments, options browser, bar widget. |
 | `omanix.approval` | omanix | human | The prompter and card surface: change cards (routine banner, full card, diff view), root-command cards, pending badge, Undo toast. |
@@ -2342,8 +2350,8 @@ Upstream's `omarchy`, `omarchy-app` and `diagnose-crash` texts are folded into `
 | eval | `eval-*` fixtures: ref-default, ref-nvidia, ref-laptop, vm-test, agent-sudo-approval, no-agent (`loom.agent.enable = false`), reviewer-off, server, **lanzaboote** (D7); omanix on `nixos-unstable` only, loom on 26.05 **and** unstable (D1) with the pinned, unmodified nuketown |
 | conventions | `layout` (declaring file == option path via `declarationPositions`), `priorities` (+ force-allowlist), `documented`, `assertion-messages` |
 | host repo | `host-template` (template + sample answers render, evaluate and build with IFD off; exactly one `nixpkgs` lock node, U29); `keys-sync` (render(`loom.keys`) == committed files; refusal cases: no owner, two owners, deleted CODEOWNERS; the mint stub tree passes); `hostgen-escape` (answers with `"`, `\`, `${`, newlines, unicode are rendered as data or refused); `home-owned` (U31); `set-roundtrip` (U19); `catalog-size` (U20) |
-| card | `card-render` (collector fixture → `card.json`, routine/full form truth table); `review-parse` (valid, oversize and invalid reviewer output → shown or "No AI review"); `nuketown-glue` (C2 no `/agents` mount in disko; C8: sudoers holds the two wrapper rules without `SETENV`, `approvalAllow` = `loom.agent.sudoCommands`, null with `"any"`; the `loom-switch` kind and reviewer options are set) |
-| nuketown (nuketown's `checks.nix`) | `signi-compat` (K10); `module-sudoex-run` updated (no `SETENV`; `sudoex-run` is the wrapper; K1, K2); `approval-request-json` (argv with spaces, newlines, `SUDO:` text and control characters round-trips into `request.json`, K3); `snapshot-rules` (which argv elements are snapshotted and which run, K4) |
+| card | `card-render` (collector fixture → `card.json`, routine/full form truth table); `review-parse` (valid, oversize and invalid reviewer output → shown or "No AI review"); `nuketown-glue` (C2 no `/agents` mount in disko; C8: the resident's only sudoers rule starts `nuketown-approve` as `nuketown-approval`, `approvalAllow` = `loom.agent.sudoCommands`, null with `"any"`; the `loom-switch` kind and reviewer options are set) |
+| nuketown (nuketown's `checks.nix`, built) | `signi-compat` (K10); `module-sudo` (one agent rule, run-as `nuketown-approval`, K1); `module-approval-sudoers` (no agent rule runs as root, no old wrappers, no `SETENV` on agent or service-user rules, human in the read group, audit dir persisted; K1, K2, K11, K12); `module-approval-reviewer`; `module-broker-groups` (agents not in `nuketown-broker`) |
 | fork | `fork-classify` (U21), `menu-intents`, `hw-quirks`, `skills-no-arch`, `fork-license`, `themes-render`, `jsonc-equivalence`, `keybind-conflicts` (both locations named), `hl-symbols` and the `omarchy-src` post-check (`no-usr-paths`, call graph, `luac -p`, `qmllint`) |
 | home | `home-files-golden`, `hm-owned-readonly`, `runtime-writers`, `hm-unmanaged-paths` (allows exactly the nuketown broker unit, C4); `eval-*` fixtures assert `home-manager.users.<u>` builds with `home.enableNixpkgsReleaseCheck` on |
 | catalogs | `catalogs` (all build and validate; `index.json` complete; U40), `cli-contract` |
@@ -2358,7 +2366,7 @@ Shared fixtures in `loom/tests/lib`:
 - OVMF, swtpm, and canokey (FIDO2) through `virtualisation.qemu.package = pkgs.qemu.override { canokeySupport = true; }` (nixpkgs builds QEMU without it). `canokey-qemu` is marked broken on 26.05, so canokey-dependent tests (`fde-fido2`, the FIDO2 case of `silo-enrollment` S4) run only on the unstable/26.11 leg; the 26.05 leg skips them and says so
 - the silo stand-in (`silo-standalone`, host `silo.test`, test host key)
 - test human and release keys
-- an approval stub: the human's broker gets a test prompter (K6) that answers `APPROVED` or `DENIED[: reason]` from a driver-controlled file, so the real broker, request directories, snapshots and reviewer run are exercised (nuketown's runtime `mode` file is not used)
+- an approval stub: the human's broker gets a test prompter (K6) that records the request directory and approves or denies from a driver-controlled file (nuketown's `tests/approval-node.nix` does exactly this), so the real broker, request directories, snapshots and reviewer run are exercised (nuketown's runtime `mode` file is not used)
 - **a `networking.hosts` tripwire mapping `silo.loom.farm` to `0.0.0.0` in every node**
 
 The installer test image differs from the release image only in three ways: `loom.installer.tty = "ttyS0"`, the baked `loom.silo.host = "silo.test"`, and a red banner/label. **There is no answers file and no unattended code path.** The driver reads the line-mode TUI on the serial console and answers it, and passes `loom.host=<id>` on the cmdline. The release image asserts `silo.host != silo.test`.
@@ -2374,17 +2382,14 @@ The installer test image differs from the release image only in three ways: `loo
 | `sops-host-key` / `sops-tpm-age1tag` | loom | The file backend decrypts, and the resident's ssh key arrives from `secrets/agents.yaml` (C3). The second test settles the UNVERIFIED age1tag round trip and gates the `tpm` backend. |
 | `repo-id-vector` | loom | §d.5 |
 | `pipeline-e2e` | loom | On the S3 stand-in: a replay resident commits and runs `loom propose --request …` → build → `sudo loom-switch` → collector (bundle into the mirror, git diff, nvd) → reviewer (`harness = "replay"`, run as uid 1101) → routine card → test prompter `APPROVED` → switch promoted → `master` pushed with the host key. Variants: `DENIED: keep bluetooth` reaches the resident's stderr and nothing switches; a bundle that doesn't descend from the deployed commit is refused (exit 5) with no dialog; a reviewer stub that prints garbage gives "No AI review" and the full form; the human's `loom propose` goes through `pkexec loom-switch-request` with no review. |
-| `approval-dialog` | loom | With the **real** nuketown broker and the built-in zenity prompter in a Hyprland session (uwsm): a request shows the review above the command after `promptDelay`, **Details** shows the snapshot, and clicking Approve (ydotool) runs it (U37, U42). |
+| `approval-dialog` | loom | With the **real** nuketown broker and the built-in zenity prompter in a Hyprland session (uwsm): a request shows the review above the command, **Show files** shows the snapshot, and clicking Approve (ydotool) runs it (U37, U42). |
 | `switch-watchdog` | loom | A change → promoted. A commit that breaks the health check → rolled back, boot default unchanged, `gate/rejected/<tip>`. **`loom-switch` killed mid-test → the dead-man timer rolls back.** A proposal that breaks `~/.config/hypr/*.lua` fails `configerrors` inside the watchdog window, after the step-3a reload, and rolls back. |
 | `undo-rollback` | loom | GUI Undo builds from the store and runs on the human's click through polkit `farm.loom.undo` (U43); the resident's `loom undo` is a routine card with no review; a watchdog failure needs none; booting an older generation from the loader yields the "make it the default?" card; `sudo nixos-rebuild switch` outside loom is noted on the next card. |
 | `update-card` | loom | The timer produces a host `update:` commit; a signed omanix tag → routine "Update ready"; an unsigned rev is not taken; a plugin input bump on request → full card; nothing switches without the approval. |
-| `agent-sudo-approval` | loom | With the default list: `sudo journalctl -n 5` as ada raises the card and runs only on approval; `sudo id` is refused with no dialog (K8); with `loom.agent.sudo = "any"`, `sudo id` raises the card. `sudo /run/current-system/sw/bin/sudoex-run id` as ada raises the card too (K1, U39). |
-| `nuketown-sudoex-bypass` | nuketown | K1: `sudo sudoex-run id` as an agent with default rules raises a dialog; denied, it doesn't run. Fails on today's nuketown. |
-| `nuketown-setenv-bypass` | nuketown | K2: `sudo BASH_ENV=/tmp/x sudo-with-approval true` is refused by sudo and `/tmp/x` never runs. |
-| `nuketown-argv-newline` | nuketown | K3: arguments containing `\n`, `\n\nSUDO:ada:true` and `user:cmd` text: `request.json` argv equals what runs, and the prompter receives exactly one request. |
-| `approval-review-snapshot` | nuketown | K4, K5: for `sudo bash ./x.sh` and `sudo ./x.sh` the snapshot runs, not the original; editing `x.sh` after the request changes nothing; the reviewer stub sees the same sha256; a file the script sources is listed in `cannotSee` by the replay reviewer fixture. |
-| `approval-review-unavailable` | nuketown | K5, K6: reviewer disabled, signed out, hanging past `timeout`, printing garbage: the dialog still appears (after `promptDelay` for zenity) with "No AI review" and never approves by itself; a generic request times out as Deny. |
-| `approval-kinds` | nuketown | K7: a fixture kind's collector runs before the review; its non-zero exit refuses with its message and no dialog; `NUKETOWN_APPROVAL_DIR` reaches the command. |
+| `agent-sudo-approval` | loom | With the default list: `sudo journalctl -n 5` as ada raises the card and runs only on approval; `sudo id` is refused with no dialog (K8); with `loom.agent.sudo = "any"`, `sudo id` raises the card. `/run/wrappers/bin/sudo -n -u root id` as ada fails (K1). |
+| `vm-sudo-approval-bypass` (built, passes) | nuketown | K1, K2, K3, K4, K8: `sudo -l -U ada` shows only the `nuketown-approval` rule and `sudo -n -u root` fails; ada can't connect to the broker socket; `BASH_ENV=` and `-E` on the service-user rule are refused and nothing runs; a denied command doesn't run; `sh -c $'true\nSUDO:ada:ls'` is one argv element in `request.json` and one prompt; `--decrypt` with a newline is refused before asking; a 0700 root script is refused ("cannot read") both as `argv[0]` and as `bash <file>`, with no prompt; `approvalAllow = [ "id" ]` allows `id` and refuses `true` before asking; the root-only mock file still works and ada can't write it. Against the pre-`7a2b84e` code it reproduced all three bypasses. |
+| `vm-approval-flow` (built, passes) | nuketown | K4–K6, K9, K12, with the real broker, a stub prompter and a stub reviewer: stdout and exit code (7) pass through; `sudo -u bob` runs as bob; relative paths resolve from the agent's cwd; for `sudo bash ./s.sh` and `sudo ./s.sh`, editing `s.sh` after the request is sent runs the original and the reviewer saw the same bytes; reviewer ok / hung (timeout) / garbage / failing → `review.json` ok or unavailable and the prompt still happens; `sudoex --decrypt` with a real GPG key is one request, decrypts, and the command reads the key; the journal record has requester, decision and exit code, the audit copy exists, the run directory is gone, and sudo logged the service user's commands. |
+| `approval-kinds` (W1b) | nuketown | K7: a fixture kind's collector runs before the review; its non-zero exit refuses with its message and no dialog; `NUKETOWN_APPROVAL_DIR` reaches the command. |
 | `silo-enrollment` | seed + loom | On the S3 stand-in: (1) the first push by the human test key ⇒ `.owner_key` = human, HEAD = master; (2) the enroll key pushes the install commit (CODEOWNERS at the mint HEAD); (3) afterward the enroll key is rejected on `master` **and** on `gate/*`; (4) the host key pushes `master`, the agent key only `gate/*` (U15); (5) a push without `CODEOWNERS` in HEAD is never produced by loom; (6) sk keys work as owner, in CODEOWNERS and in `.authorized_keys` (S4); (7) a second line in `.owner_key` loses the owner bypass (documents F3 for S1); (8) the enroll key force-pushes `master` with an extra attacker key in both files, then `configure revoke-enroll` lists the unsigned commit, recommends re-mint, and with `--reuse-anyway` restores the exact human-only set. |
 | `installer-offline-eval` | loom | Network-less install evaluates the host flake from the archived inputs. |
 | `installer-e2e` (loom-only profile) | loom | The driver runs `loom-mint` (human test key pushes) → flash a fake USB → console-driven install with agent sudo = listed (the SEK paper check first rejects a retype with one wrong group, then accepts the full key) → reboot → unlock with the SEK → `git ls-remote` shows the install commit → enroll key rejected → `nuketown.agents.ada.sudo.approvalAllow` = the default list → the first card (secrets-prompt) is approved through the stub. |
@@ -2437,9 +2442,9 @@ Rev 3's U1–U9, U14, U16–U18 concerned dropped machinery and are listed in Ap
 | U36 | Offline flake eval during install from archived inputs | `installer-offline-eval` |
 | U37 | nuketown's HM broker unit, restarted by omanix autostart after uwsm imports the session environment, shows zenity on the Hyprland session (it sets only `DISPLAY=:0`) | `approval-dialog`; fallback: a loom drop-in in `/etc/systemd/user/nuketown-broker.service.d/` adding `WAYLAND_DISPLAY` and `After=graphical-session.target` ordering via `PartOf=` |
 | U38 | (rev 4's `\n`-escape claim for the dialog text; moot with K3 request directories) | — |
-| U39 | nuketown's sudo shim passes `--why` through, and `sudo-with-approval` still resolves through `secure_path` with `SETENV` removed | `agent-sudo-approval`, `nuketown-setenv-bypass` |
+| U39 | ~~settled~~ by W1: the shim passes `--why` (`vm-approval-flow`); `SETENV` is gone and agent commands resolve in the system PATH (`vm-sudo-approval-bypass`) | — |
 | U40 | The `unstable = final` alias satisfies `nixosOptionsDoc` for nuketown's `portal.command` default | `catalogs` |
-| U41 | `systemd-run --uid=reviewer --pipe` with `HOME` set lets `claude -p` use the reviewer's persisted login non-interactively | manual run with a real login; replay in CI |
+| U41 | `sudo -H -u reviewer` from the service user lets `claude -p` use the reviewer's persisted login non-interactively, within the 45 s default timeout | manual run with a real login; stub reviewer in CI |
 | U42 | The pinned zenity supports `--extra-button` with `--question` | `approval-dialog` |
 | U43 | polkit sees the human's Quickshell (uwsm) session as active and local, for `farm.loom.propose` and `farm.loom.undo` | `undo-rollback`, `human-commit` |
 
@@ -2474,7 +2479,8 @@ Deterministic runs use `loom.agent.harness = "replay"` and `loom.reviewer.harnes
 | V5 | The card summary comes from a reviewer resident reading the request, git diff, nvd and the build result; the diffs are always one click away; routine cards are one line. | H8, §g.4, §h.4 |
 | V6 | `omanix.lib.mkHost` returns a `nixosSystem` with loom + nuketown + the omanix base, then loads the host's plain NixOS/HM modules. Plugins are modules from any flake. Typed verbs remain as agent tools; option catalogs remain. | H4, §b.3, §b.4, §d, §h.8, §h.9 |
 | **V7** | **2026-10-28, v1 security scope cut.** nuketown stays unchanged except for critical compatibility (none needed; §a.3 handles it in loom). v1 forgoes the hardening against a compromised resident: request ledger, human-signed approval merges, nonces, the deterministic facts engine and highlight list, the preflight VM, reviewer isolation and egress, reinstall chain audit, and N1–N15. Approval is nuketown's existing dialog. The material is kept as Appendix H. Amended by V8 (nuketown changes K1–K10). | §0, §a.3, §g, §h.4, §i, Appendix H |
-| **V8** | **2026-10-28, reviewed sudo, no switch daemon.** `loom-switchd` is dropped; the resident switches with `sudo loom-switch` through nuketown approval, from a short per-agent approval list (mino-style; D8 decides "any command"). Every approval gets an adversarial plain-English review by the reviewer resident, over snapshotted scripts so what runs is what was reviewed. nuketown changes in v1: the `sudoex-run`, `SETENV` and request-line fixes, the swappable prompter, request kinds, the approval list and the approval reviewer (K1–K10). | H5, H7–H9, H18, §a.3, §c.3, §g.3, §g.4, §h.4, §j scene 5 |
+| **V8** | **2026-10-28, reviewed sudo, no switch daemon.** `loom-switchd` is dropped; the resident switches with `sudo loom-switch` through nuketown approval, from a short per-agent approval list (mino-style; D8 decides "any command"). Every approval gets an adversarial plain-English review by the reviewer resident, over snapshotted scripts so what runs is what was reviewed. nuketown changes in v1: the `sudoex-run`, `SETENV` and request-line fixes, the swappable prompter, request kinds, the approval list and the approval reviewer (K1–K10). |
+| **V8.1** | **2026-10-28, approval service user.** Root does not run the request work: an unprivileged `nuketown-approval` system user does (request directory, snapshots read as the requester, review, broker), and reaches root only through `sudo`, so every privileged step is logged; root only runs the approved command. Agents' only sudo rule starts `nuketown-approve` as that user; only it can reach the broker. Built as W1 (K1–K6, K8–K12). | §a.3, §g.1, §g.3, §g.4, §i, W1, W1b | H5, H7–H9, H18, §a.3, §c.3, §g.3, §g.4, §h.4, §j scene 5 |
 | D1 | nixos-unstable (then 26.11) for the omanix stack; loom stays CI-green on 26.05 for signi. | H1, §b.1, §i.1 |
 | D2 | Fork point v4.5.0-rc2 (`5978d93`); moved only by a recorded decision prepared by the porting report. | H3, §b.1, §f.2 |
 | D3 | No Seed-side builder in v1 (local Nix / WSL2). | H15, §b.1, §e.2 |
@@ -2517,13 +2523,14 @@ Rules for all packages:
 | ID | Title | Repo | Scope / files | Deps | Acceptance criteria |
 |---|---|---|---|---|---|
 | **W0** | Contract-first loom skeleton | loom | New flake layout; `lib/{mk-host,catalog,checks,repo-id,keys}.nix`, `force-allowlist.nix`; options-only skeletons for every `modules/loom/**` file in §c.1, except `modules/loom/{default,host,keys}.nix`, implemented fully (`loom.keys` and the `loom keys sync` renderer); `templates/host` (plain-module host: `configuration.nix`, `home.nix`, `machine.nix`, `keys.nix`, `modules/`); AGENTS.md; setup-remotes; CI matrix 26.05 + unstable (D1); lanzaboote input (D7); nuketown pinned; removal of the MVP auth/QR server and `installer.nix`. | — | `layout`, `priorities`, `documented`, `keys-sync` (incl. refusal fixtures and the mint stub tree) pass. The template host evaluates on both channels via `loom.lib.mkHost`. |
-| **W1** | nuketown approval changes | nuketown | K1–K10 (§a.3): `module.nix` (`nuketown-approve-run`, `sudoex-run` wrapper, sudoers without `SETENV`, request directories and snapshots, `approval.{reviewer,kinds}`, `sudo.approvalAllow`, shim `--why`), `approval-daemon.nix` (`REQUEST:<id>`, `prompter`, the built-in zenity prompter with review and Details), `nuketown-review` (prompt, parse), `checks.nix` | — | `signi-compat`, `nuketown-sudoex-bypass` (fails before, passes after), `nuketown-setenv-bypass`, `nuketown-argv-newline`, `approval-review-snapshot`, `approval-review-unavailable`, `approval-kinds` pass. A mynix signi build's `nvd diff` shows only nuketown's packages; signi's zenity dialog works with the reviewer off. |
+| **W1** | nuketown approval changes (**built**) | nuketown | K1–K6, K8–K12 (§a.3): `approval.nix` (service user, `nuketown-approve`, snapshots, reviewer, audit, sudoers), `module.nix` (shim with `--why`, `sudoex`, `sops-unlock`, `sudo.approvalAllow`), `approval-daemon.nix` (`REQUEST:<id>`, `prompter`, zenity renderer with **Show files**), `checks.nix`, `tests/{approval-node,sudo-approval-bypass,approval-flow}.nix` | — | Done 2026-10-28 on nuketown `master` (`7a2b84e`, `6b4960c`, `eafb45f`, `6b9e5c1`; only `7a2b84e` pushed): `nix flake check`, `vm-sudo-approval-bypass` and `vm-approval-flow` pass; mynix signi evaluates with `--override-input`. Not yet: a signi build/`nvd diff`/switch, and the zenity dialog seen on a real desktop (U42). |
+| **W1b** | nuketown approval, rest | nuketown | K7 kinds; `--requester` from root; `NUKETOWN_APPROVAL_DIR`; deny reason to stderr; prompt before the review finishes; DECRYPT + command: show the dialog first and start gpg only after Approve (today pinentry opens behind the dialog and grabs the keyboard, so the PIN has to be typed blind) | W1 | `approval-kinds` passes; `decrypt-after-approve` (gpg not started before the prompter exits 0); `pipeline-e2e`'s human and timer variants reach the card. |
 | **W2** | silo test infrastructure | seed | S3 `silo-standalone`, S4 sk-key test, the `silo-enrollment` seed half, the agent-gate cases (U15). **No change to `shell.nix` or `hooks.nix` behavior.** | — | `silo-enrollment` seed half passes: human first push ⇒ owner, HEAD = master, enroll self-removal, enroll rejected on gate/*, sk keys work, F3 multi-line note documented, U15 cases recorded. |
 | **W3** | omarchy fork mechanics + packages | omanix | As rev 3: `flake.nix` (omarchy at `5978d93`), `fork/{UPSTREAM.toml,NOTICE,classify.toml,drop.txt,rewrite.toml,hl-symbols.txt,patches/*}` (P1–P4, P6, P9, P15, P16 branding, P17 weather; the shell-plugin patches are W18), `fork/add/bin/*`, `lib/fork.nix`, `pkgs/by-name/*`, `apps.{porting-report,fork-mirror}`, `LICENSES/`, `port-omarchy` skill | — | Every package builds. `fork-classify` is green **at `5978d93`** (U21); `fork-license`, the `omarchy-src` post-check, `hl-symbols` pass. The titlebars `.so` loads in a headless Hyprland smoke. `porting-report --to bc220e7` produces a report (smoke, not a gate). |
 | **W4** | Disk, unlock, boot | loom | `modules/loom/disk/*` (incl. `@agents`/`@agents-blank` without a mount, C2), `boot/*`, `diskoLayout`, unlock text and assertions, the `loom-sek` LUKS slot + token, `loom-askpass`, the `unlock-finalize` first-boot step, `loom unlock`, lanzaboote (D7) | W0, W6, W11 (test) | `fde-passphrase`, `fde-fido2`, `fde-tpm2-pin`, `fde-recovery` (U33), `fde-tpm2-requires-sb`, `sek-vectors`, `eval-lanzaboote`, `boot-lanzaboote` pass. The autologin assertion has a negative fixture. |
 | **W5** | Impermanence, persist audit, snapshots, home wiring | loom | `modules/loom/persist/*`, `lib/persist-audit.nix`, `installBinds`, `modules/loom/home.nix` (HM NixOS module, `loomReclaim`, ordering drop-in, `hm-activation` watchdog check) | W0, W11 (test), W8 (test) | `impermanence-survives-reboot` (incl. nuketown's `/agents` reset), audit assertion fixtures, `hm-reclaim` pass. |
 | **W6** | Secrets lifecycle, keys CLI, SEK lib | loom | `modules/loom/secrets/*`, `.sops.yaml` render, prompted secrets, `pkgs/loom-cli/{sek.py,keys.py}` (`loom-sek`; `loom keys list/sync/add-human [--generate]/remove-human/rotate host|agent`, `loom user passwd`) | W0, W5 (test) | `sops-host-key` passes; `sops-tpm-age1tag` runs (red allowed, then `tpm` asserted off); `sek-vectors` (python half + token schema); pytest proves the `--generate` passphrase never reaches argv/env and that a passphrase-less key is refused. |
-| **W8** | loom-switch, collector, watchdog, updates, undo | loom | `pkgs/loom-switch` (`loom-switch`, `loom-switch-collect`, `loom-switch-request`; mirror, refusals, diffs, flags, `card.json`, records), `pkgs/loom-watchdog`, `pkgs/loom-cli` (`propose`, `card show`, `undo`, `rollback`), polkit actions `farm.loom.{propose,undo}`, `modules/loom/{switch/*,update.nix,trust.nix}`, the `loom-switch` kind registration, the SEK-rotation marker refusal (used by W13) | W0, W1, W11, W2 (test) | `card-render`, `switch-watchdog`, `undo-rollback`, `update-card`, `agent-sudo-approval` and `pipeline-e2e` (reviewer disabled; terminal and replay-resident proposals) pass against the test prompter. |
+| **W8** | loom-switch, collector, watchdog, updates, undo | loom | `pkgs/loom-switch` (`loom-switch`, `loom-switch-collect`, `loom-switch-request`; mirror, refusals, diffs, flags, `card.json`, records), `pkgs/loom-watchdog`, `pkgs/loom-cli` (`propose`, `card show`, `undo`, `rollback`), polkit actions `farm.loom.{propose,undo}`, `modules/loom/{switch/*,update.nix,trust.nix}`, the `loom-switch` kind registration, the SEK-rotation marker refusal (used by W13) | W0, W1, W1b, W11, W2 (test) | `card-render`, `switch-watchdog`, `undo-rollback`, `update-card`, `agent-sudo-approval` and `pipeline-e2e` (reviewer disabled; terminal and replay-resident proposals) pass against the test prompter. |
 | **W9** | Agent bridge | loom | `pkgs/loom-agent-bridge` (chat socket server, claude-code stream-json and replay adapters, `loom-open-url`, attachments to the inbox), `modules/loom/{chat.nix,agent/bridge.nix}`, `loom.chat/v1` | W0, W11 (test) | Adapter fixture tests (U11) pass; pytest covers framing, reconnect and attachment limits. |
 | **W10** | Reviewer wiring | loom | `loom.reviewer.*` → `nuketown.approval.reviewer`, `pkgs/loom-switch-review` (the switch prompt), reviewer sign-in wiring | W1, W8, W11 | `review-parse` passes; `pipeline-e2e` with the replay reviewer passes, including the garbage-output and signed-out variants. |
 | **W11** | Residents, user and base host modules, first boot | loom | `modules/loom/agent/{default,login,nuketown}.nix` (`loom.agent.*` and `loom.reviewer.*` → the two nuketown agents and approval options of §c.3; the C1–C8 glue of §a.3: persist-root assertion, `btrfsDevice`, `secrets/agents.yaml`, broker HM import, the uwsm restart hook option, the `pkgs.unstable` alias, portals; agent units gated on `repo-publish.done`), the approval test prompter (`tests/lib/approval-stub.nix`), `modules/loom/firstboot.nix`, `modules/loom/{user,locale,nix,hardware}.nix` | W0, W1 | `nuketown-glue`, `eval-agent-sudo-approval`, `eval-no-agent`, `eval-reviewer-off`, `layout` pass. A VM test shows the resident's units inactive without `repo-publish.done` and active with it. First-boot runner pytest passes. Catalogs of the template host build (U40). |
@@ -2545,7 +2552,7 @@ W7 (facts and highlight list) is withdrawn; its scope is Appendix H.4. W1 is nuk
 - After W0: W5, W6 and (with W1) W11 in parallel; W9 can start against W11's agent user stub. W4 starts once W6's `loom-sek` lib lands; W12 once W6's `keys sync` lands. W15 starts once W3 and W5's `loom.home` land.
 - W8 follows W1 and W11. W10 follows W8. W13 follows W4 and W8. W14 joins W4, W5, W6, W8, W11, W12.
 - Desktop track: W15 → W16, W17 (parallel) and W18 (also needs W8, W9) → W19 → W20; W21's VM part closes after W10, W17, W18, W19, and its manual part after W20.
-- **Critical paths:** change pipeline **W0 + W1 → W11 → W8 → W10 → W21** (W1 is nuketown work and starts on day one); installer **W0 → W6 → W4 → W14 → W20**; desktop **W3 + W5 → W15 → W18 → W19 → W20**. The desktop path is the longest; the demo needs all three.
+- **Critical paths:** change pipeline **W0 + W1b → W11 → W8 → W10 → W21** (W1 is built; W1b is the rest of the nuketown work and can start now); installer **W0 → W6 → W4 → W14 → W20**; desktop **W3 + W5 → W15 → W18 → W19 → W20**. The desktop path is the longest; the demo needs all three.
 
 ---
 

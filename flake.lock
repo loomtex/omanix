@@ -174,14 +174,15 @@
         ],
         "nixpkgs-2605": "nixpkgs-2605",
         "nuketown": "nuketown",
+        "seed-silo": "seed-silo",
         "sops-nix": "sops-nix"
       },
       "locked": {
-        "lastModified": 1793244540,
-        "narHash": "sha256-M4OFgAtP+yFpmmdwuG6On68NkRxCxsI5nXBCACI7aZE=",
+        "lastModified": 1793256697,
+        "narHash": "sha256-kxJliI2QpqLmERM/0rqediu2IGDnJ7nHrlRNaaohsfo=",
         "ref": "v2-skeleton",
-        "rev": "a45abd033a3d9dd82a068d5416fb2b8473c3208d",
-        "revCount": 29,
+        "rev": "f2e3d719c181713241d356d7f6f7c05630644960",
+        "revCount": 49,
         "type": "git",
         "url": "file:///agents/ada/projects/loom"
       },
@@ -276,11 +277,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793228384,
-        "narHash": "sha256-KvuG/7ug4t7su2meATfYfW3jNCgXlbBjxelIzTKoYFU=",
+        "lastModified": 1793255161,
+        "narHash": "sha256-DhxN0WLJlvrEdLmB9bIPSmnM3OxW8yeTnIsmp2uzGpE=",
         "owner": "joshperry",
         "repo": "nuketown",
-        "rev": "6b9e5c17f61218c9447a07606accbdd53d9cb5c0",
+        "rev": "9ba63dc416749d6562fbfa4f5dc6a2e0575d35d0",
         "type": "github"
       },
       "original": {
@@ -355,6 +356,22 @@
       "original": {
         "owner": "oxalica",
         "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
+    "seed-silo": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1793229726,
+        "narHash": "sha256-VV99EDRXy9/yzN3fVVHjjGSbOSQFiKLz8RtgK50qzdM=",
+        "owner": "loomtex",
+        "repo": "seed",
+        "rev": "6fb61c7a9b020a959d2395829c03503b012c5085",
+        "type": "github"
+      },
+      "original": {
+        "owner": "loomtex",
+        "repo": "seed",
         "type": "github"
       }
     },

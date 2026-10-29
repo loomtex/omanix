@@ -159,4 +159,8 @@
     option = "loom.switch.afterTest";
     reason = "a list that only appends: the Hyprland reload and the post-promotion settle (§f.4.6)";
   }
+  {
+    option = "i18n.inputMethod.fcitx5.addons";
+    reason = "a list that only appends: upstream's input-method engines";
+  }
 ]

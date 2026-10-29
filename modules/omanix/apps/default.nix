@@ -45,7 +45,7 @@ let
     evince = [ evince ];
     imv = [ imv ];
     mpv = [ mpv ];
-    libreoffice = [ libreoffice-fresh ];
+    libreoffice = [ libreoffice ];
     pinta = [ pinta ];
     gnome-disk-utility = [ gnome-disk-utility ];
     moonlight = [ moonlight-qt ];

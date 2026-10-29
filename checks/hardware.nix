@@ -146,6 +146,11 @@ in
       touch $out
     '';
 
+  # §i.2 writers-respect-hm, W17's cases: font set and text size, input
+  # (U28), defaults and apps (U35). W16 adds the glass and chromium-wrapper
+  # cases to the same test.
+  writers-respect-hm = import ../tests/writers-respect-hm.nix { inherit pkgs loom; omanix = self; };
+
   # The nouveau-cursor fixture: the built HM looknfeel.lua carries the setting.
   quirk-nouveau-cursor =
     let h = refWith [ (on [ "nouveau-cursor" ]) ]; in

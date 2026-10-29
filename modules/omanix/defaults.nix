@@ -88,9 +88,13 @@ in
       # differs. xdg-settings needs no session bus for the generic desktop
       # (it writes mimeapps.list through xdg-mime), so this works at boot (U35).
       home.activation.omanixDefaults = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-        current=$(env -u BROWSER XDG_CURRENT_DESKTOP= ${xdgSettings} get default-web-browser 2>/dev/null || true)
+        xdg() {
+          env -u BROWSER XDG_CURRENT_DESKTOP= PATH=${lib.makeBinPath [ pkgs.xdg-utils pkgs.coreutils pkgs.gnugrep pkgs.gnused pkgs.gawk pkgs.findutils pkgs.which ]}:$PATH \
+            XDG_DATA_DIRS=/etc/profiles/per-user/${user}/share:/run/current-system/sw/share ${xdgSettings} "$@"
+        }
+        current=$(xdg get default-web-browser 2>/dev/null || true)
         if [ "$current" != ${lib.escapeShellArg browser.desktop} ]; then
-          run env -u BROWSER XDG_CURRENT_DESKTOP= ${xdgSettings} set default-web-browser ${lib.escapeShellArg browser.desktop} || true
+          run xdg set default-web-browser ${lib.escapeShellArg browser.desktop} || true
         fi
       '';
     });

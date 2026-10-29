@@ -138,8 +138,19 @@ in
     environment.etc."xkb/rules/evdev".source = "${up}/etc/xkb/rules/evdev";
     environment.etc."xkb/symbols/omarchy".source = "${up}/etc/xkb/symbols/omarchy";
 
+    # Fcitx5 with upstream's input-method engines; upstream's omarchy-fcitx5
+    # user unit starts it (its xdg autostart entry is hidden in HM).
+    i18n.inputMethod = {
+      enable = lib.mkDefault true;
+      type = lib.mkDefault "fcitx5";
+      fcitx5.waylandFrontend = lib.mkDefault true;
+      fcitx5.addons = with pkgs; [
+        fcitx5-gtk qt6Packages.fcitx5-chinese-addons fcitx5-mozc fcitx5-hangul fcitx5-chewing fcitx5-table-extra
+      ];
+    };
+
     # The keyboard picker's catalog (evdev.lst) and python.
-    environment.systemPackages = [ pkgs.xkeyboard_config pkgs.python3 ];
+    environment.systemPackages = [ pkgs.xkeyboard_config (pkgs.python3.withPackages (p: [ p.pygobject3 ])) ];
     environment.pathsToLink = [ "/share/X11/xkb" ];
 
     # omarchy-restart-trackpad (fork/add): this unit, startable by the active local user.

@@ -6,8 +6,9 @@
 # theme is omanix.theme.boot.theme.
 #
 #   $out/share/plymouth/themes/<name>/   the theme (boot.plymouth.themePackages)
-#   $out/share/omanix/logo.png           the wordmark in the theme's accent
-#   $out/share/omanix/preview-unlock.png a still of the unlock screen
+#   $out/share/omanix-plymouth/<name>/logo.png            the wordmark in the accent
+#   $out/share/omanix-plymouth/<name>/preview-unlock.png  a still of the unlock screen
+# (per theme name, so several variants can share one buildEnv)
 #
 # The wordmark is drawn from JetBrains Mono until omanix has a designed logo.
 {
@@ -44,7 +45,7 @@ runCommand "omanix-plymouth-${themeName}"
   }
   ''
     d=$out/share/plymouth/themes/${themeName}
-    mkdir -p $d $out/share/omanix
+    mkdir -p $d $out/share/omanix-plymouth/${themeName}
     # -strip: no timestamps in the PNGs, so the output is reproducible
     tint() { magick "$1" -channel RGB +level-colors "$2","$2" -strip "$3"; }
 
@@ -54,7 +55,7 @@ runCommand "omanix-plymouth-${themeName}"
     magick -background none -fill white -font ${font} -pointsize 200 label:omanix \
       -trim +repage -strip logo-white.png
     tint logo-white.png '${omanixPalette.accent}' $d/logo.png
-    cp $d/logo.png $out/share/omanix/logo.png
+    cp $d/logo.png $out/share/omanix-plymouth/${themeName}/logo.png
 
     sed -e 's/^Window.SetBackgroundTopColor.*/Window.SetBackgroundTopColor(${rgb omanixPalette.background});/' \
         -e 's/^Window.SetBackgroundBottomColor.*/Window.SetBackgroundBottomColor(${rgb omanixPalette.background});/' \
@@ -95,5 +96,5 @@ runCommand "omanix-plymouth-${themeName}"
       \( $d/bullet.png -resize 7x7! \) -geometry +$((ex + 32))+$by -composite \
       \( $d/bullet.png -resize 7x7! \) -geometry +$((ex + 44))+$by -composite \
       \( $d/bullet.png -resize 7x7! \) -geometry +$((ex + 56))+$by -composite \
-      -strip $out/share/omanix/preview-unlock.png
+      -strip $out/share/omanix-plymouth/${themeName}/preview-unlock.png
   ''

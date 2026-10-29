@@ -98,6 +98,11 @@ in
       description = "omanix: runtime overlays and first login";
       wantedBy = [ "graphical-session-pre.target" ];
       before = [ "graphical-session-pre.target" ];
+      # Stopped with the session, so the next login runs it again even when
+      # the user manager outlives the session (UserStopDelaySec, lingering);
+      # otherwise RemainAfterExit keeps it "active" and the lock and
+      # overlays = "reset" are skipped (theme-switch caught it).
+      partOf = [ "graphical-session-pre.target" ];
       unitConfig.ConditionUser = user;
       environment = sessionEnv;
       serviceConfig = {

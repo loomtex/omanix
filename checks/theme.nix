@@ -105,7 +105,7 @@ in
         [ -e ${t}/$f ] || { echo "untrusted extra lost or lacks $f" >&2; exit 1; }
       done
       case $(readlink -f ${t}/unlock.png) in
-        */share/omanix/logo.png) ;;
+        */share/omanix-plymouth/omanix/logo.png) ;;
         *) echo "unlock.png is $(readlink -f ${t}/unlock.png), not the omanix wordmark" >&2; exit 1 ;;
       esac
       touch $out

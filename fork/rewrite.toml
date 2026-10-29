@@ -1359,3 +1359,12 @@ file = "bin/omarchy-theme-set"
 from = 'cp -r "$OMARCHY_THEMES_PATH/$THEME_NAME/"*'
 to = 'cp -r --no-preserve=mode "$OMARCHY_THEMES_PATH/$THEME_NAME/"*'
 count = 1
+
+# Terminal reload: nixpkgs wraps kitty, so its process is `.kitty-wrapped`
+# and upstream's `pgrep -x kitty` / `killall kitty` never reach it; a theme
+# switch left running kitty windows on the old colors (theme-switch).
+[[rewrite]]
+file = "bin/omarchy-restart-terminal"
+from = "if pgrep -x kitty >/dev/null; then\n  killall -SIGUSR1 kitty >/dev/null"
+to = "if pgrep -x '\\.?kitty(-wrapped)?' >/dev/null; then\n  pkill -SIGUSR1 -x '\\.?kitty(-wrapped)?' >/dev/null"
+count = 1

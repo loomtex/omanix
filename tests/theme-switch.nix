@@ -51,7 +51,7 @@ pkgs.testers.runNixOSTest {
         out = subprocess.run([MAGICK, shot, "-format", f"%[hex:p{{{x},{y}}}]", "info:"], capture_output=True, text=True, check=True).stdout
         return "#" + out.strip()[:6].lower()
 
-    def near(a, b, tol=40):
+    def near(a, b, tol=16):
         return all(abs(int(a[i:i+2], 16) - int(b[i:i+2], 16)) <= tol for i in (1, 3, 5))
 
     def window_points():
@@ -67,15 +67,23 @@ pkgs.testers.runNixOSTest {
         return pts
 
     def assert_terminals(t, name):
+        # The VM's scanout sometimes stays black until something repaints
+        # (an all-black screenshot); retry with a Hyprland reload, which
+        # repaints and does not touch the terminals' colors.
         machine.sleep(6)
-        machine.screenshot(name)
-        shot = os.path.join(os.environ["out"], name + ".png")
-        pts = window_points()
-        assert set(pts) == {"alacritty", "kitty", "foot"}, pts
-        for term, (x, y) in pts.items():
-            got = pixel(shot, x, y)
-            print(f"{name}: {term} at {x},{y} is {got}, {t} background {BG[t]}")
-            assert near(got, BG[t]), f"{term} shows {got}, not {t}'s {BG[t]}"
+        for attempt in range(5):
+            shotname = f"{name}-{attempt}"
+            machine.screenshot(shotname)
+            shot = os.path.join(os.environ["out"], shotname + ".png")
+            pts = window_points()
+            assert set(pts) == {"alacritty", "kitty", "foot"}, pts
+            got = {term: pixel(shot, x, y) for term, (x, y) in pts.items()}
+            print(f"{shotname}: {got}, {t} background {BG[t]}")
+            if all(near(g, BG[t]) for g in got.values()):
+                return
+            machine.succeed(as_user("hyprctl -i 0 reload"))
+            machine.sleep(3)
+        raise AssertionError(f"terminals show {got}, not {t}'s {BG[t]}")
 
     wait_desktop()
 
@@ -102,7 +110,7 @@ pkgs.testers.runNixOSTest {
             set_theme(t)
             assert_terminals(t, f"terminals-{t}")
             for f in ("kitty.conf", "alacritty.toml", "foot.ini"):
-                machine.succeed(f"grep -qi '{BG[t]}' {STATE}/theme/{f}")
+                machine.succeed(f"grep -qi '{BG[t][1:]}' {STATE}/theme/{f}")   # foot.ini has no '#'
             machine.wait_until_succeeds(f"grep -qx '{chromium_hex()}' /run/omanix/browser-color.applied", timeout=T(30))
             machine.succeed(f"grep -q '{chromium_hex()}' /etc/chromium/policies/managed/color.json")
             configerrors_empty()
@@ -122,7 +130,14 @@ pkgs.testers.runNixOSTest {
         machine.fail(as_user("omarchy-theme-set catppuccin-latte"))
         machine.succeed(as_user("omarchy-theme-set catppuccin-latte 2>&1 | grep -q 'locked to tokyo-night'"))
         machine.succeed("grep '\"appearance.theme\"' /run/current-system/omarchy/default/omarchy/omarchy-menu.jsonc | grep -q '\"when\":\"false\"'")
-        assert theme_name() == "kanagawa"
+        # switch-to-configuration restarted the changed session-init unit,
+        # so the relock already ran. Drift the theme past the guard (the
+        # unguarded script it wraps), then log in again.
+        machine.wait_until_succeeds(f"grep -qx tokyo-night {STATE}/theme.name", timeout=T(60))
+        real = machine.succeed("sed -n 's/^exec \\(.*omarchy-theme-set\\) .*/\\1/p' /run/current-system/omarchy/bin/omarchy-theme-set").strip()
+        assert real.startswith("/nix/store/"), real
+        machine.succeed(as_user(f"OMARCHY_THEME_WAIT=1 {real} kanagawa </dev/null"))
+        assert theme_name() == "kanagawa", theme_name()
         machine.succeed("systemctl restart display-manager")
         machine.sleep(5)
         wait_desktop()

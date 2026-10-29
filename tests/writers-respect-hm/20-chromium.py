@@ -17,7 +17,8 @@ with subtest("chromium: a runtime feature goes to overlay/chromium-flags.conf an
     machine.succeed(as_user("setsid -f chromium --headless=new --user-data-dir=/tmp/omanix-cr about:blank >/tmp/omanix-cr.log 2>&1 </dev/null"))
     machine.wait_until_succeeds(f"pgrep -u {USER} -f -- 'OmanixProbe,Second'", timeout=T(90))
     pid = machine.succeed(f"pgrep -u {USER} -o -f -- 'OmanixProbe,Second'").strip()
-    argv = machine.succeed(f"tr '\\0' '\\n' < /proc/{pid}/cmdline").splitlines()
+    # chromium rewrites its process title: one space-joined string
+    argv = machine.succeed(f"tr '\\0' ' ' < /proc/{pid}/cmdline").split()
     print(argv)
     assert want in argv, argv
     assert "--load-extension=/run/current-system/omarchy/default/chromium/extensions/copy-url,/run/current-system/omarchy/default/chromium/extensions/yt-dlp,/run/current-system/omarchy/default/chromium/extensions/whatsapp-slim" in argv, argv

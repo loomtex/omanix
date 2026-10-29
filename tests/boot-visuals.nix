@@ -48,15 +48,26 @@ pkgs.testers.runNixOSTest {
     def near(a, b, tol=12):
         return all(abs(int(a[i:i+2], 16) - int(b[i:i+2], 16)) <= tol for i in (1, 3, 5))
 
-    def check(t, what):
-        name = f"{t}-{what}"
+    def shot_ok(t, name):
         machine.screenshot(name)
         shot = os.path.join(OUT, name + ".png")
         corner = "#" + magick(shot, "-format", "%[hex:p{4,4}]", "info:")[:6].lower()
-        assert near(corner, PAL[t]["background"]), f"{name}: corner {corner}, background {PAL[t]['background']}"
         acc = float(magick(shot, "-fuzz", "8%", "-fill", "white", "-opaque", PAL[t]["accent"], "-fill", "black", "+opaque", "white", "-format", "%[fx:mean]", "info:"))
-        print(f"{name}: corner {corner}, accent coverage {acc:.4f}")
-        assert acc > 0.005, f"{name}: the accent-colored logo is not on screen ({acc})"
+        print(f"{name}: corner {corner} (background {PAL[t]['background']}), accent coverage {acc:.4f}")
+        return shot, near(corner, PAL[t]["background"]) and acc > 0.005
+
+    def check(t, what, diag=None):
+        name = f"{t}-{what}"
+        # retry: the VM's scanout can lag a mode set by a few seconds
+        for attempt in range(6):
+            shot, ok = shot_ok(t, name)
+            if ok:
+                break
+            machine.sleep(2)
+        if not ok:
+            if diag:
+                print(machine.execute(diag)[1])
+            raise AssertionError(f"{name}: the theme's background and accent logo are not on screen")
         golden = os.path.join(GOLDEN, name + ".png")
         if os.path.exists(golden):
             r = subprocess.run([MAGICK, "compare", "-metric", "AE", "-fuzz", "10%", golden, shot, "null:"], capture_output=True, text=True)
@@ -78,13 +89,14 @@ pkgs.testers.runNixOSTest {
             machine.succeed("rm -f /etc/plymouth/plymouthd.conf && "
                             f"printf '[Daemon]\\nTheme=omanix-{t}\\nShowDelay=0\\nDeviceTimeout=8\\n' > /etc/plymouth/plymouthd.conf")
             machine.succeed("chvt 1")
-            machine.succeed("plymouthd --mode=boot --tty=/dev/tty1 --pid-file=/run/omanix-plymouthd.pid")
+            machine.succeed("plymouthd --mode=boot --tty=/dev/tty1 --pid-file=/run/omanix-plymouthd.pid --debug --debug-file=/tmp/plymouthd.log")
+            machine.succeed("plymouth --ping")
             machine.succeed("plymouth show-splash")
             machine.execute("plymouth ask-for-password --prompt=Unlock >/dev/null 2>&1 &")
             machine.sleep(3)
             machine.send_chars("omanix")
             machine.sleep(2)
-            check(t, "plymouth")
+            check(t, "plymouth", diag="tail -n 80 /tmp/plymouthd.log; ls -la /dev/dri; cat /proc/fb")
             machine.execute("plymouth quit; sleep 1; pkill plymouthd; pkill -f 'plymouth ask-for-password'")
             machine.sleep(2)
 
@@ -97,7 +109,7 @@ pkgs.testers.runNixOSTest {
             machine.sleep(8)
             machine.send_chars("omanix")
             machine.sleep(2)
-            check(t, "sddm")
+            check(t, "sddm", diag="journalctl -b --no-pager -n 60 -u display-manager")
             machine.succeed("systemctl stop display-manager")
             machine.sleep(3)
   '';

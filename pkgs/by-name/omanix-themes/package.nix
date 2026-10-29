@@ -60,8 +60,8 @@ let
         mkdir -p "$d/backgrounds"
         magick -size 3840x2160 'xc:${palette.background}' -strip "$d/backgrounds/0-omanix.png"
       fi
-      [ -e "$d/unlock.png" ] || ln -s ${splash}/share/omanix/logo.png "$d/unlock.png"
-      [ -e "$d/preview-unlock.png" ] || ln -s ${splash}/share/omanix/preview-unlock.png "$d/preview-unlock.png"
+      [ -e "$d/unlock.png" ] || ln -s ${splash}/share/omanix-plymouth/omanix/logo.png "$d/unlock.png"
+      [ -e "$d/preview-unlock.png" ] || ln -s ${splash}/share/omanix-plymouth/omanix/preview-unlock.png "$d/preview-unlock.png"
     '';
 in
 runCommand "omanix-themes"

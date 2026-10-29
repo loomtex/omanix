@@ -6,7 +6,8 @@
 # Generated:
 #   default/hypr/omanix-overlay.lua      the overlay loader (§f.4.3)
 #   config/omarchy/shell.json            upstream defaults ⊕ omanix.shell.settings (lists atomic)
-#   default/omarchy/omarchy-menu.jsonc   upstream menu + omanix.menu.items
+#   default/omarchy/omarchy-menu.jsonc   the intent menu (omanix-menu, W18), or upstream menu + omanix.menu.items
+#   default/omanix/intents.json          intent rows by id (omanix-menu)
 #   default/omanix/language              omanix.language (OMARCHY_LANGUAGE_FILE)
 #   default/omanix/release               omanix.release
 {
@@ -19,6 +20,7 @@
   language ? "en",
   release ? "0.1.0-dev",
   menuText ? null, # the merged menu (lib.menu.appendItems), or null for upstream's
+  menu ? null, # an omanix-menu output (omarchy-menu.jsonc + intents.json); wins over menuText
 }:
 
 let
@@ -36,7 +38,7 @@ let
     end
   '';
   settingsJson = writeText "omanix-shell-settings.json" (builtins.toJSON shellSettings);
-  menu = if menuText == null then null else writeText "omarchy-menu.jsonc" menuText;
+  menuFile = if menuText == null || menu != null then null else writeText "omarchy-menu.jsonc" menuText;
 in
 runCommand "omanix-data-${release}"
   {
@@ -48,6 +50,12 @@ runCommand "omanix-data-${release}"
     mkdir $out
     cp -rs --no-preserve=mode ${omarchy-src}/. $out/
     chmod -R u+w $out
+
+    # The shell is copied, not linked: its plugin registry scans for manifests
+    # with `find -type f`, which skips symlinks (no plugin, the menu included,
+    # would load), and QML resolves imports next to the file it really is.
+    rm -rf $out/shell
+    cp -r --no-preserve=mode ${omarchy-src}/shell $out/shell
 
     install -Dm644 ${overlayLoader} $out/default/hypr/omanix-overlay.lua
 
@@ -70,9 +78,14 @@ runCommand "omanix-data-${release}"
         f.write("\n")
     EOF
 
+    ${lib.optionalString (menuFile != null) ''
+      rm $out/default/omarchy/omarchy-menu.jsonc
+      install -m644 ${menuFile} $out/default/omarchy/omarchy-menu.jsonc
+    ''}
     ${lib.optionalString (menu != null) ''
       rm $out/default/omarchy/omarchy-menu.jsonc
-      install -m644 ${menu} $out/default/omarchy/omarchy-menu.jsonc
+      install -m644 ${menu}/omarchy-menu.jsonc $out/default/omarchy/omarchy-menu.jsonc
+      install -Dm644 ${menu}/intents.json $out/default/omanix/intents.json
     ''}
 
     mkdir -p $out/default/omanix

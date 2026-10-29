@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "omanix.welcome",
+  "name": "Welcome",
+  "version": "1.0.0",
+  "author": "omanix",
+  "license": "MIT",
+  "description": "First-boot checklist (network, publish, encryption key, sign-ins) and a short tour.",
+  "kinds": ["service", "panel"],
+  "entryPoints": {
+    "service": "Service.qml",
+    "panel": "Panel.qml"
+  }
+}

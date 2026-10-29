@@ -1,0 +1,36 @@
+From: Ada <ada@6bit.com>
+Date: Thu, 29 Oct 2026 01:11:21 -0600
+Subject: [PATCH] P18: no pkexec for the Tailscale operator
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The operator is declared (services.tailscale.extraSetFlags in the tailscale
+app module); Authorize asks the agent instead (DESIGN §f.2.5 P18).
+---
+ shell/plugins/panels/tailscale/Service.qml | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/shell/plugins/panels/tailscale/Service.qml b/shell/plugins/panels/tailscale/Service.qml
+index b4a139e..d6f2099 100644
+--- a/shell/plugins/panels/tailscale/Service.qml
++++ b/shell/plugins/panels/tailscale/Service.qml
+@@ -414,13 +414,12 @@ Item {
+     exitNodeProcess.running = true
+   }
+ 
++  // omanix (P18): the operator is declared (services.tailscale.extraSetFlags
++  // in the tailscale app module), so this asks the agent instead of pkexec.
+   function authorizeTailscaleOperator() {
+-    if (!installed || operatorProcess.running || userName === "") return
+-    _operatorOutput = ""
+-    _operatorError = ""
+-    actionStatus = I18n.t("tailscale.authorizingOperator")
+-    operatorProcess.command = ["pkexec", "tailscale", "set", "--operator=" + userName]
+-    operatorProcess.running = true
++    if (!installed || userName === "") return
++    IpcRegistry.call("omanix.chat", "prefill", [JSON.stringify({ source: "tailscale", id: "install.service.tailscale", skill: "apps",
++      text: "Let me manage Tailscale without a password: make " + userName + " its operator." })])
+   }
+ 
+   function runAction(command, label) {

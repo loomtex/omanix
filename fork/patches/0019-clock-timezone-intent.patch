@@ -1,0 +1,49 @@
+From: Ada <ada@6bit.com>
+Date: Thu, 29 Oct 2026 01:04:12 -0600
+Subject: [PATCH] P19: the clock's middle click opens the timezone intent row
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+omarchy-menu-timezone ran timedatectl set-timezone, which a declared
+time.timeZone forbids. Middle click opens the menu at update.timezone,
+whose timezones provider lists the zones and asks the agent (DESIGN
+§f.2.5 P19, §f.3).
+---
+ shell/plugins/menu/Menu.qml              | 7 +++++++
+ shell/plugins/panels/clock/BarWidget.qml | 4 +++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/shell/plugins/menu/Menu.qml b/shell/plugins/menu/Menu.qml
+index aa3a269..4e50cfd 100644
+--- a/shell/plugins/menu/Menu.qml
++++ b/shell/plugins/menu/Menu.qml
+@@ -357,6 +357,13 @@ Item {
+       script: "current=$(head -n1 \"${OMARCHY_LANGUAGE_FILE:-/dev/null}\" 2>/dev/null); jq -r --arg c \"${current:-en}\" 'to_entries | sort_by(if .key == \"en\" then \"\" else .value.englishName end) | .[] | [.value.name, .key, $c, .value.englishName] | @tsv' \"$OMARCHY_PATH/default/i18n/locales.json\"",
+       icon: "\uf1ab",
+       intentFor: true
++    },
++    // omanix (P19): timezone is loom.locale.timeZone (static /etc/localtime),
++    // so the picker's rows ask the agent (update.timezone).
++    "timezones": {
++      script: "current=$(timedatectl show -p Timezone --value 2>/dev/null); timedatectl list-timezones 2>/dev/null | while read -r z; do printf '%s\\t%s\\t%s\\n' \"$z\" \"$z\" \"$current\"; done",
++      icon: "\uf43a",
++      intentFor: true
+     }
+   })
+ 
+diff --git a/shell/plugins/panels/clock/BarWidget.qml b/shell/plugins/panels/clock/BarWidget.qml
+index 65f11cf..2b84452 100644
+--- a/shell/plugins/panels/clock/BarWidget.qml
++++ b/shell/plugins/panels/clock/BarWidget.qml
+@@ -168,7 +168,9 @@ BarWidget {
+ 
+     onPressed: function(b) {
+       if (b === Qt.RightButton) root.cycleFormat()
+-      else if (b === Qt.MiddleButton) { if (root.bar) root.bar.run("omarchy-menu-timezone") }
++      // omanix (P19): the timezone is declared; the menu's timezone row
++      // picks one and asks the agent (picker-then-intent).
++      else if (b === Qt.MiddleButton) { if (root.bar && root.bar.shell) root.bar.shell.summon("omarchy.menu", JSON.stringify({ menu: "update.timezone" })) }
+       else root.togglePanel()
+     }
+ 

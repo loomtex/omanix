@@ -39,7 +39,7 @@ in
 
   # Stage 6 runs inside the build; this keeps it in the check list.
   omarchy-src = pkgs.omarchy-src;
-}
+} // import ./shell.nix { inherit pkgs self inputs; }
 // import ./desktop.nix { inherit pkgs self inputs; }
 // import ./hardware.nix { inherit pkgs self inputs; }
 // lib.mapAttrs' (n: v: lib.nameValuePair "pkg-${n}" v)

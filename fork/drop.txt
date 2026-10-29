@@ -50,6 +50,9 @@ test
 .greptile
 .luarc.json
 
+# W18 (P7): no passwordless sudo on omanix (D8).
+shell/plugins/bar/indicators/PasswordlessSudo.qml
+
 # bin/: AGENT-INTENT, DROP and RE-EXPRESS-IN-NIX scripts (216)
 bin/omarchy-agent-account-copy
 bin/omarchy-agent-account-transfer

@@ -1,0 +1,70 @@
+From: Ada <ada@6bit.com>
+Date: Thu, 29 Oct 2026 01:11:21 -0600
+Subject: [PATCH] P12: the theme picker removes user themes itself; repo themes ask
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+omarchy-theme-remove is an agent intent on omanix. A user-installed theme
+(a real directory in ~/.config/omarchy/themes) is removed by the picker;
+a theme the host repo adds (listed in default/omanix/theme-extra.txt)
+offers Remove as a request to the agent (DESIGN §f.2.5 P12).
+---
+ shell/plugins/image-picker/ImagePicker.qml | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
+
+diff --git a/shell/plugins/image-picker/ImagePicker.qml b/shell/plugins/image-picker/ImagePicker.qml
+index 583deb2..8bb2bd3 100644
+--- a/shell/plugins/image-picker/ImagePicker.qml
++++ b/shell/plugins/image-picker/ImagePicker.qml
+@@ -405,8 +405,11 @@ Item {
+     return nameForPath(currentPath())
+   }
+ 
++  // omanix (P12): themes the host repo adds (omanix.theme.extra, listed in
++  // default/omanix/theme-extra.txt) offer Remove too, as a request to the agent.
++  property var repoThemeNames: []
+   function canDeleteSelectedTheme() {
+-    return themeMode && !deleteThemeProc.running && !awaitingDeleteRefresh && stockThemesKnown && ImagePickerModel.canDeleteTheme(selectedThemeName(), extraThemeNames, stockThemeNames)
++    return themeMode && !deleteThemeProc.running && !awaitingDeleteRefresh && stockThemesKnown && (ImagePickerModel.canDeleteTheme(selectedThemeName(), extraThemeNames, stockThemeNames) || repoThemeNames.indexOf(selectedThemeName()) !== -1)
+   }
+ 
+   function requestDeleteSelectedTheme() {
+@@ -421,8 +424,8 @@ Item {
+     pendingDeleteTheme = ""
+   }
+ 
+-  // Removal itself is omarchy-theme-remove's job (including its guards and
+-  // notification); the picker only refreshes its rows once it finishes.
++  // A user-installed theme is a directory under userThemesPath (real dirs
++  // only, see extraThemesProc); the picker refreshes its rows once it is gone.
+   function confirmDeleteTheme() {
+     var name = pendingDeleteTheme
+     deleteConfirmOpen = false
+@@ -430,7 +433,12 @@ Item {
+     if (!name || deleteThemeProc.running) return
+     // Keep the user's place in the list once the deleted theme is gone.
+     if (name === selectedThemeName()) deleteSelectionPath = ImagePickerModel.replacementSelectionPath(imageArray, selectedIndex, filterText)
+-    deleteThemeProc.command = ["omarchy-theme-remove", name]
++    if (extraThemeNames.indexOf(name) === -1) {
++      IpcRegistry.call("omanix.chat", "prefill", [JSON.stringify({ source: "themes", id: "remove.theme", text: "Remove the " + name + " theme.", skill: "themes", path: "Theme › " + name })])
++      root.close()
++      return
++    }
++    deleteThemeProc.command = ["rm", "-rf", "--", root.userThemesPath + "/" + name]
+     deleteThemeProc.running = true
+   }
+ 
+@@ -503,6 +511,12 @@ Item {
+     onExited: function(exitCode) { if (exitCode === 0) root.stockThemesKnown = true }
+   }
+ 
++  FileView {
++    path: root.omarchyPath + "/default/omanix/theme-extra.txt"
++    printErrors: false
++    onLoaded: root.repoThemeNames = ImagePickerModel.parseThemeNames(String(text() || ""))
++  }
++
+   Process {
+     id: deleteThemeProc
+     onExited: function(exitCode) {

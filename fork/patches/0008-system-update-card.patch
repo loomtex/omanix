@@ -1,0 +1,39 @@
+From: Ada <ada@6bit.com>
+Date: Thu, 29 Oct 2026 01:11:21 -0600
+Subject: [PATCH] P8: the update widget opens the Update ready card
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+omarchy-update-available is re-expressed over loom's update state (W3); a
+click opens the card through omanix.approval instead of running
+omarchy-update, and the poll runs every ten minutes (DESIGN §f.2.5 P8).
+---
+ shell/plugins/bar/widgets/SystemUpdate.qml | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/shell/plugins/bar/widgets/SystemUpdate.qml b/shell/plugins/bar/widgets/SystemUpdate.qml
+index 1d53d1d..aeae829 100644
+--- a/shell/plugins/bar/widgets/SystemUpdate.qml
++++ b/shell/plugins/bar/widgets/SystemUpdate.qml
+@@ -16,8 +16,10 @@ BarWidget {
+ 
+   function clear() { updateAvailable = false }
+ 
++  // omanix (P8): an update is a card ("Update ready"), approved like any
++  // other change; omarchy-update-available reads loom's update state.
+   function runUpdate() {
+-    if (root.bar) root.bar.run("omarchy-launch-floating-terminal-with-presentation omarchy-update")
++    if (root.bar) root.bar.run("omarchy-shell omanix.approval openUpdate")
+   }
+ 
+   visible: updateAvailable
+@@ -45,7 +47,7 @@ BarWidget {
+   }
+ 
+   Timer {
+-    interval: 21600000
++    interval: 600000
+     running: true
+     repeat: true
+     triggeredOnStart: true

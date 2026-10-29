@@ -12,9 +12,11 @@ in
   _file = ./default.nix;
 
   imports = [
+    ./approval.nix
     ./apps
     ./audio.nix
     ./branding.nix
+    ./chat.nix
     ./defaults.nix
     ./dns.nix
     ./fonts.nix
@@ -41,6 +43,7 @@ in
     ./session.nix
     ./shell.nix
     ./weather.nix
+    ./welcome.nix
   ];
 
   options.omanix = {

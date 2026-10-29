@@ -1,0 +1,67 @@
+From: Ada <ada@6bit.com>
+Date: Thu, 29 Oct 2026 01:04:12 -0600
+Subject: [PATCH] P11: language and kernel pickers end in an intent
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The languages provider reads the i18n registry directly and the kernels
+provider lists nixpkgs kernel sets; their rows fill the submenu's intent
+template instead of running omarchy-language / omarchy-kernel, which are
+agent intents on omanix (DESIGN §f.2.5 P11).
+---
+ shell/plugins/menu/Menu.qml | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
+
+diff --git a/shell/plugins/menu/Menu.qml b/shell/plugins/menu/Menu.qml
+index 38e11c6..aa3a269 100644
+--- a/shell/plugins/menu/Menu.qml
++++ b/shell/plugins/menu/Menu.qml
+@@ -341,20 +341,22 @@ Item {
+       actionFor: function(value) { return "omarchy-powerprofiles-set autodetect " + Util.shellQuote(value) }
+     },
+     // Kernel names are package names, the same in every language.
++    // omanix (P11): picker-then-intent. The kernel is boot.kernelPackages,
++    // so the rows are nixpkgs kernel sets and choosing one asks the agent.
+     "kernels": {
+-      script: "current=$(omarchy-kernel get 2>/dev/null); omarchy-kernel list 2>/dev/null | while read -r k; do [[ -z $k ]] && continue; printf '%s\\t%s\\t%s\\n' \"$k\" \"$k\" \"$current\"; done",
++      script: "printf '%s\\t%s\\t\\n' 'Default (LTS)' linuxPackages Latest linuxPackages_latest Zen linuxPackages_zen Hardened linuxPackages_hardened",
+       icon: "\uf17c",
+-      volatile: true,
+-      actionFor: function(value) { return "omarchy-kernel set " + Util.shellQuote(value) }
++      intentFor: true
+     },
+     // Rows carry a fourth field (the English name) so searching "danish"
+     // finds the row labeled with its native name; mergeProviderRows turns
+     // it into an alias.
++    // omanix (P11): the registry is read directly (omanix.language is
++    // declared; the row asks the agent to change it).
+     "languages": {
+-      script: "current=$(omarchy-language 2>/dev/null); omarchy-language list 2>/dev/null | while IFS=$'\\t' read -r name code english; do [[ -z $code ]] && continue; printf '%s\\t%s\\t%s\\t%s\\n' \"$name\" \"$code\" \"$current\" \"$english\"; done",
++      script: "current=$(head -n1 \"${OMARCHY_LANGUAGE_FILE:-/dev/null}\" 2>/dev/null); jq -r --arg c \"${current:-en}\" 'to_entries | sort_by(if .key == \"en\" then \"\" else .value.englishName end) | .[] | [.value.name, .key, $c, .value.englishName] | @tsv' \"$OMARCHY_PATH/default/i18n/locales.json\"",
+       icon: "\uf1ab",
+-      volatile: true,
+-      actionFor: function(value) { return "omarchy-language " + Util.shellQuote(value) }
++      intentFor: true
+     }
+   })
+ 
+@@ -452,13 +454,16 @@ Item {
+       providerRows.push({
+         id: rowId,
+         parent: menuId,
+-        kind: "action",
++        kind: spec.intentFor ? "intent" : "action",
+         icon: (value === current) ? "✓" : (spec.icon || ""),
+         label: label,
+         title: "",
+         target: "",
+         description: "",
+-        action: spec.actionFor(value),
++        // omanix (P11): an intentFor provider fills its submenu's template.
++        action: spec.intentFor ? "" : spec.actionFor(value),
++        intent: spec.intentFor && root.item(menuId) ? root.item(menuId).intent : "",
++        value: value,
+         provider: "",
+         aliases: [],
+         searchTerms: (parts[3] ? [parts[3]] : []).concat(label !== rawLabel ? [rawLabel] : []),

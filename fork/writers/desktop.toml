@@ -39,37 +39,7 @@ stick = "omanix.input.layouts"
 dynamic = true
 
 # ---- pending: HM-owned writes the fork still ships ---------------------
-# W18/W19: the menu's "edit config" entries open HM-owned files; they become
-# `omanix edit <path>` (overlay, or the read-only file + the owning option).
-[[pending]]
-file = "default/omarchy/omarchy-menu.jsonc"
-target = ".config/hypr/monitors.lua"
-patch = "W18 menu: omanix edit"
-[[pending]]
-file = "default/omarchy/omarchy-menu.jsonc"
-target = ".config/hypr/bindings.lua"
-patch = "W18 menu: omanix edit"
-[[pending]]
-file = "default/omarchy/omarchy-menu.jsonc"
-target = ".config/hypr/input.lua"
-patch = "W18 menu: omanix edit"
-[[pending]]
-file = "default/omarchy/omarchy-menu.jsonc"
-target = ".config/hypr/hyprland.lua"
-patch = "W18 menu: omanix edit"
-[[pending]]
-file = "default/omarchy/omarchy-menu.jsonc"
-target = ".config/hypr/hyprsunset.conf"
-patch = "W18 menu: omanix edit"
-# W17 made ~/.XCompose (input.nix) and ~/.config/chromium-flags.conf
-# (apps/default.nix) HM-owned: the menu's XCompose edit entry and its
-# Chromium-account install action (which writes an oauth flag into the file)
-# wait for W18's menu.
-[[pending]]
-file = "default/omarchy/omarchy-menu.jsonc"
-target = ".XCompose"
-patch = "W18 menu: omanix edit (overlay/xcompose)"
-[[pending]]
-file = "default/omarchy/omarchy-menu.jsonc"
-target = ".config/chromium-flags.conf"
-patch = "W18 menu: Chromium account becomes an apps intent (omanix.apps.chromium, overlay/chromium-flags.conf)"
+# W18: the menu's "edit config" entries (monitors, keybindings, input,
+# hyprland, hyprsunset, xcompose) are intent rows or the monitor panel in the
+# intent menu (fork/intents.toml), and the chromium-account install row is an
+# intent; none opens or writes an HM-owned file any more.

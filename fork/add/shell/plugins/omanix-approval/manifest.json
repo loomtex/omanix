@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "omanix.approval",
+  "name": "Approvals",
+  "version": "1.0.0",
+  "author": "omanix",
+  "license": "MIT",
+  "description": "Approval cards for the resident's root commands and system changes (omanix-approval-prompt draws them here).",
+  "kinds": ["service"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}

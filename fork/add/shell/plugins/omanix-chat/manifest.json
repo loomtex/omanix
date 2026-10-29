@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "omanix.chat",
+  "name": "Agent chat",
+  "version": "1.0.0",
+  "author": "omanix",
+  "license": "MIT",
+  "description": "Chat with the resident agent: the panel on SUPER + A, the menu's intents, and the bar's agent dot.",
+  "kinds": ["service", "panel", "bar-widget"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "panel": "Panel.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Agent",
+    "description": "The resident's state; click to open the chat.",
+    "category": "AI",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

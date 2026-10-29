@@ -1,0 +1,32 @@
+From: Ada <ada@6bit.com>
+Date: Thu, 29 Oct 2026 01:11:21 -0600
+Subject: [PATCH] P13: the Agents panel shows the resident, read-only
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The human's own harness accounts are unchanged; a tile from omanix.status
+shows the resident's state and opens its chat (DESIGN §f.2.5 P13).
+---
+ shell/plugins/agents/Panel.qml | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/shell/plugins/agents/Panel.qml b/shell/plugins/agents/Panel.qml
+index 33a0627..f84e5b0 100644
+--- a/shell/plugins/agents/Panel.qml
++++ b/shell/plugins/agents/Panel.qml
+@@ -1094,6 +1094,14 @@ Panel {
+             }
+           }
+ 
++          // omanix (P13): the resident's state, read-only (omanix.status).
++          Loader {
++            width: column.width
++            active: root.addStage === ""
++            source: Util.fileUrl(Quickshell.env("OMARCHY_PATH") + "/shell/plugins/omanix-status/ResidentTile.qml")
++            onLoaded: { item.shell = root.bar ? root.bar.shell : null; item.foreground = root.foreground }
++          }
++
+           AddView {
+             visible: root.addStage !== "" || root.blankSlate
+             width: column.width

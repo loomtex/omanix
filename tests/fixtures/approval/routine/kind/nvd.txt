@@ -1,0 +1,6 @@
+<<< /nix/store/0000000000000000000000000000000b-nixos-system-kestrel
+>>> /nix/store/0000000000000000000000000000000a-nixos-system-kestrel
+Added packages:
+[A.]  #1  gamemode  1.8.2
+[A.]  #2  steam  1.0.0.81
+[A.]  #3  steam-run  1.0.0.81

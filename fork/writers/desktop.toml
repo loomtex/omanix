@@ -93,6 +93,6 @@ patch = "W18 menu: omanix edit"
 file = "default/omarchy/omarchy-menu.jsonc"
 target = ".config/hypr/hyprsunset.conf"
 patch = "W18 menu: omanix edit"
-# Not HM-owned yet, so not listed: ~/.XCompose (menu edit entry) and
-# ~/.config/chromium-flags.conf (menu install action). When W17's input.nix
-# and apps own them, this check fails until they are patched or listed.
+# Not HM-owned yet, so not listed: ~/.XCompose (menu edit entry). When W17's
+# input.nix owns it, this check fails until it is patched or listed.
+# (~/.config/chromium-flags.conf is HM-owned since W16: theme.toml.)

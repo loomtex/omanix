@@ -28,6 +28,15 @@ etc/mise/conf.d/omarchy-agent-accounts.toml
 # modules and quirk rows, so nothing under install/ ships.
 install
 
+# Theme media (W16). U23: no wallpaper or intro video at the pin carries an
+# attribution, so they stay out of the default closure until cleared; the
+# theme registry (pkgs/by-name/omanix-themes) draws a plain background per
+# theme instead. unlock.png and preview-unlock.png are the omarchy wordmark
+# (branding, §f.2.8); the registry draws omanix ones from omanix-plymouth.
+themes/*/backgrounds
+themes/*/unlock.png
+themes/*/preview-unlock.png
+
 # Branding and the meaningless version file (P16 adds omanix branding).
 logo.svg
 logo.txt
@@ -50,7 +59,7 @@ test
 .greptile
 .luarc.json
 
-# bin/: AGENT-INTENT, DROP and RE-EXPRESS-IN-NIX scripts (216)
+# bin/: AGENT-INTENT, DROP and RE-EXPRESS-IN-NIX scripts (215)
 bin/omarchy-agent-account-copy
 bin/omarchy-agent-account-transfer
 bin/omarchy-agent-crash
@@ -65,7 +74,6 @@ bin/omarchy-branding-about
 bin/omarchy-branding-screensaver
 bin/omarchy-channel-current
 bin/omarchy-channel-set
-bin/omarchy-chromium-add-feature
 bin/omarchy-default-agent
 bin/omarchy-default-browser
 bin/omarchy-default-dictation

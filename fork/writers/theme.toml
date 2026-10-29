@@ -1,6 +1,66 @@
-# Theme writers (§f.5): every write lands in ~/.local/state/omarchy/** or in
-# app-owned files. W16 completes this table (glass, backgrounds).
+# Theme writers (§f.5, §f.4.4): every write lands in ~/.local/state/omarchy/**,
+# in app-owned files, or in an omanix overlay; none touches an HM-owned file.
+# Rows for scripts that are ASSET (helpers theme-set runs) are the record;
+# checks.runtime-writers requires rows for the KEEP-AS-GUI ones.
 
 [[writer]]
 script = "omarchy-theme-set"
 writes = ".local/state/omarchy/current/** (theme state), .local/state/omarchy/theme-set-herdr-machines.log"
+stick = "omanix.theme.default"
+
+[[writer]]
+script = "omarchy-theme-set-glass"
+writes = "current/theme/{alacritty.toml,foot.ini,kitty.conf,btop.theme,ghostty.conf} (theme state); its GTK 4 block goes to overlay/gtk4.css (rewrite.toml), which the HM gtk.css imports"
+dynamic = true
+
+[[writer]]
+script = "omarchy-theme-bg-set"
+writes = ".local/state/omarchy/current/background (theme state)"
+stick = "omanix.theme.background"
+dynamic = true
+
+[[writer]]
+script = "omarchy-theme-bg-next"
+writes = ".local/state/omarchy/current/background via omarchy-theme-bg-set"
+stick = "omanix.theme.background"
+dynamic = true
+
+[[writer]]
+script = "omarchy-theme-bg-switcher"
+writes = "none itself; the picker's choice goes to omarchy-theme-bg-set"
+dynamic = true
+
+[[writer]]
+script = "omarchy-theme-bg-install"
+writes = ".config/omarchy/backgrounds/<theme>/ (user data, never HM)"
+dynamic = true
+
+[[writer]]
+script = "omarchy-theme-switcher"
+writes = "none itself; the picker's choice goes to omarchy-theme-set"
+dynamic = true
+
+[[writer]]
+script = "omarchy-toggle-theme-sync"
+writes = ".local/state/omarchy/toggles/ (runtime toggles)"
+dynamic = true
+
+[[writer]]
+script = "omarchy-theme-set-browser-policy"
+writes = "/var/lib/omanix/spool/browser-color (fork/add override; the root unit omanix-browser-policy.path publishes it)"
+dynamic = true
+
+[[writer]]
+script = "omarchy-chromium-add-feature"
+writes = "overlay/chromium-flags.conf (rewrite.toml; read by the chromium wrapper after the HM file)"
+stick = "omanix.apps.chromium.features"
+dynamic = true
+
+# ---- pending ---------------------------------------------------------------
+# The menu's Chromium Google-account row (AGENT-INTENT install) runs
+# omarchy-install-chromium-google-account, which writes the flags file; W18
+# turns the row into an intent.
+[[pending]]
+file = "default/omarchy/omarchy-menu.jsonc"
+target = ".config/chromium-flags.conf"
+patch = "W18 menu: install.service.chromium-account becomes an intent"

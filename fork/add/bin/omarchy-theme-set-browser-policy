@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-theme-set-browser-policy sha256 644aefa2176223e606c36552dd4c047be6ca8ded6635de90f298a3a086b89180
+# omarchy:summary=Hand the current theme color to the browser policy
+# omarchy:args=<rrggbb>
+# omarchy:hidden=true
+
+# Upstream writes color.json into the browsers' managed-policy directories
+# as root, through a NOPASSWD sudo rule or pkexec. omanix has neither (§f.5):
+# this writes the color into a spool the human's group may write, and the
+# root unit omanix-browser-policy.path validates it and writes the policy.
+
+set -euo pipefail
+
+SPOOL=/var/lib/omanix/spool
+APPLIED=/run/omanix/browser-color.applied
+
+if (( $# != 1 )) || [[ ! $1 =~ ^[0-9a-f]{6}$ ]]; then
+  echo "Usage: omarchy-theme-set-browser-policy <rrggbb> (six lowercase hex digits)" >&2
+  exit 1
+fi
+color="#$1"
+
+if [[ ! -d $SPOOL || ! -w $SPOOL ]]; then
+  echo "omarchy-theme-set-browser-policy: $SPOOL is not writable (is this user in the omanix-spool group?)" >&2
+  exit 1
+fi
+
+tmp=$(mktemp "$SPOOL/.browser-color.XXXXXX")
+trap 'rm -f "$tmp"' EXIT
+printf '%s\n' "$color" >"$tmp"
+chmod 0644 "$tmp"   # the root unit runs without capabilities; a color is not secret
+mv -f "$tmp" "$SPOOL/browser-color"
+trap - EXIT
+
+# The path unit runs as soon as the spool changes; wait for it, so a browser
+# refreshed after this returns reads the new policy.
+for _ in $(seq 50); do
+  [[ $(cat "$APPLIED" 2>/dev/null) == "$color" ]] && exit 0
+  sleep 0.1
+done
+echo "omarchy-theme-set-browser-policy: the policy unit did not apply $color within 5 s" >&2
+exit 1

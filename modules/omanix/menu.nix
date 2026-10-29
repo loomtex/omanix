@@ -1,7 +1,7 @@
-# omanix.menu.items: host entries in the default menu (§h.5). They are spliced
-# into $OMARCHY_PATH's omarchy-menu.jsonc (fork.nix → omanix-data); the
-# HM-owned ~/.config/omarchy/extensions/omarchy-menu.jsonc stays upstream's
-# comment-only template. W18 builds the intent menu on top of this.
+# omanix.menu.items: host entries in the default menu (§h.5). They are added
+# to $OMARCHY_PATH's intent menu by pkgs.omanix-menu (fork.nix → omanix-data);
+# the HM-owned ~/.config/omarchy/extensions/omarchy-menu.jsonc stays
+# upstream's comment-only template.
 { config, lib, ... }:
 
 let
@@ -11,10 +11,11 @@ let
       label = lib.mkOption { type = lib.types.str; description = "Visible row title."; };
       icon = lib.mkOption { type = lib.types.nullOr lib.types.str; default = null; description = "Nerd Font glyph."; };
       action = lib.mkOption { type = lib.types.nullOr lib.types.str; default = null; description = "Shell command to run (null: a submenu or a link)."; };
-      intent = lib.mkOption { type = lib.types.nullOr lib.types.str; default = null; description = "An agent intent id (W18), instead of action."; };
+      intent = lib.mkOption { type = lib.types.nullOr lib.types.str; default = null; description = "Ask the agent instead of running a command: the id of an intent row (its text and skill), or the text that pre-fills the chat (`{label}` is the row's label)."; };
+      skill = lib.mkOption { type = lib.types.nullOr lib.types.str; default = null; description = "The resident skill an intent row names."; };
       target = lib.mkOption { type = lib.types.nullOr lib.types.str; default = null; description = "An existing submenu id to open."; };
       when = lib.mkOption { type = lib.types.nullOr lib.types.str; default = null; description = "Shell condition; the row is hidden when it fails."; };
-      after = lib.mkOption { type = lib.types.nullOr lib.types.str; default = null; description = "Reserved for ordering (W18); ignored in v1."; };
+      after = lib.mkOption { type = lib.types.nullOr lib.types.str; default = null; description = "Place the entry after this id (and its children); null appends it."; };
     };
   };
 in

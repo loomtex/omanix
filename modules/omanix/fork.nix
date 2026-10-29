@@ -27,11 +27,12 @@ in
         omarchy-src = cfg.fork.package;
         shellSettings = cfg.shell.settings;
         inherit (cfg) language release;
-        menuText =
-          if cfg.menu.items == { } then null
-          else (import ../../lib/menu.nix { inherit lib; }).appendItems
-            (builtins.readFile "${cfg.fork.package}/default/omarchy/omarchy-menu.jsonc")
-            cfg.menu.items;
+        # The intent menu (W18, §h.5.2): upstream + intents.toml + menu-extra + omanix.menu.items.
+        menu = pkgs.omanix-menu.override {
+          omarchy-src = cfg.fork.package;
+          items = lib.mapAttrs (_: i: lib.filterAttrs (_: v: v != null) i) cfg.menu.items;
+          agent = if config.loom.agent.enable or false then config.loom.agent.name else "your agent";
+        };
       };
       defaultText = lib.literalExpression "pkgs.omanix-data with this host's options";
       description = "`$OMARCHY_PATH`: the fork plus the files generated from this host's options (§f.2.9).";

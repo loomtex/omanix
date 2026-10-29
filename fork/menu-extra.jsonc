@@ -1,0 +1,13 @@
+{
+  // omanix entries added to the menu (DESIGN §h.5.1); all gui. {agent} is the
+  // resident's name. `after` places an entry after an id (and its children);
+  // without it the entry goes at the end. Built by fork/tools/menu.py.
+  "ask": {"icon":"󰚩","label":"Ask {agent}…","aliases":["ask","chat","agent-chat"],"description":"Open the chat with {agent}","action":"omarchy-shell omanix.chat open","after":"apps"},
+  "whatcanichange": {"icon":"󰘦","label":"What can I change?","aliases":["options","what-can-i-change"],"action":"omarchy-shell omanix.chat whatCanIChange","after":"ask"},
+  "approvals": {"icon":"󰒃","label":"Approvals","aliases":["approvals","cards"],"action":"omarchy-shell omanix.approval open","after":"whatcanichange"},
+  "undo": {"icon":"󰕌","label":"Undo last change","aliases":["undo"],"action":"loom undo","after":"approvals"},
+  "agent": {"icon":"󱚤","label":"Agent","aliases":["resident"],"description":"{agent}: status, sign in, restart","action":"omarchy-shell omanix.chat agent","after":"undo"},
+  "appearance.make-it-stick": {"icon":"󰐃","label":"Make my look permanent","aliases":["make-it-stick","stick"],"action":"omarchy-shell omanix.chat makeItStick look","after":"appearance.unlock"},
+  "learn.nixos": {"icon":"󱄅","label":"NixOS","action":"omarchy-launch-webapp 'https://nixos.org/manual/nixos/unstable/'","after":"learn.hyprland"},
+  "learn.welcome": {"icon":"󰞅","label":"Welcome","aliases":["welcome","tour"],"action":"omarchy-shell omanix.welcome open","after":"learn.keybindings"},
+}

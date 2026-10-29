@@ -777,21 +777,6 @@ kind = "calls:omarchy-theme-remove"
 count = 1
 owner = "W18"
 [[site]]
-file = "shell/plugins/menu/Menu.qml"
-kind = "calls:omarchy-kernel"
-count = 3
-owner = "W18"
-[[site]]
-file = "shell/plugins/menu/Menu.qml"
-kind = "calls:omarchy-language"
-count = 3
-owner = "W18"
-[[site]]
-file = "shell/plugins/panels/clock/BarWidget.qml"
-kind = "calls:omarchy-menu-timezone"
-count = 1
-owner = "W18"
-[[site]]
 file = "shell/plugins/panels/elsewhen/Panel.qml"
 kind = "usr-path"
 count = 1

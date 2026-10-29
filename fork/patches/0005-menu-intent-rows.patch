@@ -1,0 +1,99 @@
+From: Ada <ada@6bit.com>
+Date: Thu, 29 Oct 2026 01:04:12 -0600
+Subject: [PATCH] P5: menu intent rows pre-fill the agent chat
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A row with an intent (and no action) is kind "intent": selecting it calls
+omanix.chat prefill through the shell's IPC registry with the rendered
+template ({label}, {value}, {selection}); nothing runs through bash. A
+keybinding route to an intent row does the same (DESIGN §f.2.5 P5, §h.5.3).
+---
+ shell/plugins/menu/Menu.qml     | 21 +++++++++++++++++++++
+ shell/plugins/menu/MenuModel.js | 14 +++++++++++++-
+ 2 files changed, 34 insertions(+), 1 deletion(-)
+
+diff --git a/shell/plugins/menu/Menu.qml b/shell/plugins/menu/Menu.qml
+index 7189cce..38e11c6 100644
+--- a/shell/plugins/menu/Menu.qml
++++ b/shell/plugins/menu/Menu.qml
+@@ -897,11 +897,28 @@ Item {
+       opened = false
+       filterText = ""
+       if (root.appLibrary) root.appLibrary.launch(appId, label)
++    } else if (row.kind === "intent") {
++      root.applyIntent(row.itemId)
+     } else {
+       root.applySelected(row.itemId, row.action)
+     }
+   }
+ 
++  // omanix (P5): an intent row pre-fills the agent chat through the shell's
++  // IPC registry (omanix.chat prefill); nothing runs through bash.
++  function applyIntent(id) {
++    var entry = root.item(id)
++    if (!entry) { cancel(); return }
++    applySerial = requestSerial
++    opened = false
++    filterText = ""
++    var parent = root.item(entry.parent)
++    var payload = { source: "menu", id: entry.providerMenu || id, path: root.pathFor(id),
++      text: MenuModel.renderIntent(entry.intent, { label: entry.label, value: entry.value || "", selection: "" }),
++      skill: entry.skill || (parent ? parent.skill : "") }
++    IpcRegistry.call("omanix.chat", "prefill", [JSON.stringify(payload)])
++  }
++
+   function requestDeleteSelected() {
+     if (!root.cursorActive || root.selectedIndex < 0 || root.selectedIndex >= displayModel.count) return
+     var row = displayModel.get(root.selectedIndex)
+@@ -1027,6 +1044,10 @@ Item {
+       root.runAction(entry.action)
+       return "ok"
+     }
++    if (entry && entry.kind === "intent") {
++      root.applyIntent(id)
++      return "ok"
++    }
+     // If it's a link (a redirect to another menu), follow the link.
+     if (entry && entry.kind === "link" && entry.target) id = entry.target
+     root.pendingInitialMenu = id
+diff --git a/shell/plugins/menu/MenuModel.js b/shell/plugins/menu/MenuModel.js
+index c0d4999..1018043 100644
+--- a/shell/plugins/menu/MenuModel.js
++++ b/shell/plugins/menu/MenuModel.js
+@@ -18,7 +18,9 @@ function normalizeItem(id, raw) {
+     parent = id.indexOf(".") >= 0 ? id.split(".").slice(0, -1).join(".") : "root"
+   if (id === "root") parent = ""
+ 
+-  var kind = value.action ? "action" : (value.target ? "link" : "menu")
++  // omanix (P5): a row with an intent and no action asks the agent; a
++  // provider-backed intent row stays a submenu whose rows carry the intent.
++  var kind = value.action ? "action" : (value.target ? "link" : (value.intent && !value.provider ? "intent" : "menu"))
+ 
+   return {
+     id: id,
+@@ -32,6 +34,8 @@ function normalizeItem(id, raw) {
+     description: value.description || "",
+     action: value.action || "",
+     provider: value.provider || "",
++    intent: value.intent || "",
++    skill: value.skill || "",
+     aliases: aliases,
+     // Search-only terms: matched by nameSearchText, never by resolveRoute.
+     // Translations put the English label here so English search keeps
+@@ -571,6 +575,14 @@ function guardScript(items) {
+ // run in-process, skipping the bash and qs ipc spawns. Anything more than the
+ // bare call, such as a second command or a shell-expanded payload, is left to
+ // bash.
++// omanix (P5): an intent template filled from the human's own session.
++// Only {label}, {value} and {selection} exist (checks.menu-intents).
++function renderIntent(template, fields) {
++  return String(template || "").replace(/\{(label|value|selection)\}/g, function(m, key) {
++    return fields && fields[key] !== undefined ? String(fields[key]) : ""
++  })
++}
++
+ function summonAction(action) {
+   var match = /^omarchy-shell shell summon ([A-Za-z0-9._-]+)(?: '([^']*)')?$/.exec(String(action || ""))
+   if (!match) return null

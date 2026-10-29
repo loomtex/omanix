@@ -147,9 +147,10 @@ in
     '';
 
   # §i.2 writers-respect-hm, W17's cases: font set and text size, input
-  # (U28), defaults and apps (U35). W16 adds the glass and chromium-wrapper
-  # cases to the same test.
-  writers-respect-hm = import ../tests/writers-respect-hm.nix { inherit pkgs loom; omanix = self; };
+  # (U28), defaults and apps (U35). Its own name so W16's writers-respect-hm
+  # (glass, chromium wrapper), built in parallel, can't shadow it in the
+  # checks attrset; fold the two when both have landed.
+  writers-respect-hm-w17 = import ../tests/writers-respect-hm-w17.nix { inherit pkgs loom; omanix = self; };
 
   # The nouveau-cursor fixture: the built HM looknfeel.lua carries the setting.
   quirk-nouveau-cursor =

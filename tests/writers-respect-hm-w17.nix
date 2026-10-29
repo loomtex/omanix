@@ -33,7 +33,7 @@ let
   '';
 in
 pkgs.testers.runNixOSTest {
-  name = "omanix-writers-respect-hm";
+  name = "omanix-writers-respect-hm-w17";
   node.pkgsReadOnly = false;
   node.specialArgs = { inputs = { }; inherit loom omanix; };
 

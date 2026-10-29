@@ -1,0 +1,303 @@
+# Hardware quirks (DESIGN §f.2.6): one row per quirk, each naming the
+# upstream script(s) it replaces, a declarative probe, and its status.
+# `v1` rows have modules/omanix/hardware/quirks/<name>.nix, which declares
+# omanix.hardware.quirks.<camelName> (asus-rog → asusRog); `deferred` rows
+# say why. checks.hw-quirks: every file under install/hardware/** and
+# install/user/hardware/** is a row's source, a [generic] entry or a [drop]
+# entry; every v1 row has a module that evaluates with the quirk on; the
+# omanix-hw-probe pytest has a sysfs fixture per probe; `requires` (U26)
+# evaluates.
+#
+# Probes are evaluated by omanix-hw-probe (stdlib python, reads /sys, /proc
+# and `lspci -nn`; never omarchy code). Keys are ANDed; `any` is a list of
+# alternative probes:
+#   dmi.<field> = "glob"     /sys/class/dmi/id/<field>, case-insensitive
+#   match = "text"           omarchy-hw-match: in product_name or product_family
+#   pci = ["vvvv:dddd"]      any of these PCI ids present
+#   pci_driver = "name"      a PCI device bound to this kernel driver
+#   lspci = "regex"          a line of `lspci -nn` matches (case-insensitive)
+#   acpi_hid = "HID"         /sys/bus/acpi/devices/*/hid
+#   usb_product = "text"     /sys/bus/usb/devices/*/product, exact
+#   input_name = "regex"     a Name= line in /proc/bus/input/devices
+#   cpu_vendor = "id"        /proc/cpuinfo vendor_id
+#   cpu_model = [n…] / cpu_model_min = n    /proc/cpuinfo model
+#   battery = true           a System (or unscoped) battery is present
+#   virt = true              /proc/cpuinfo has the hypervisor flag
+#   gpu_count_min = n        display-class (0x03) PCI devices
+#   nvidia_gpu = "open|legacy"   an NVIDIA display device ≥ 0x1e00 (GSP) / 0x1340–0x1dff
+#   x86 = true               the machine is x86_64
+#
+# requires (U26): nixpkgs attributes ("pkgs.<attr>") and NixOS options
+# ("option:<path>") the module uses that are not in every nixpkgs.
+# missing (U26): what a deferred row waits for; checks.hw-quirks fails once
+# one of them exists, so the row gets promoted.
+# nixos-hardware: the nixos-hardware module the host imports next to the
+# quirk (loom-hostgen writes both; the module asserts it is there).
+
+# ---------------------------------------------------------------- v1
+
+[quirk.nouveau-cursor]
+source = ["install/user/hardware/fix-nouveau-cursor.sh"]
+probe = { pci_driver = "nouveau" }
+status = "v1"
+mechanism = "omanix.hyprland.settings.cursor.no_hardware_cursors = true (HM looknfeel.lua)"
+
+[quirk.vm-no-animations]
+source = ["install/user/hardware/vm-no-animations.sh"]
+probe = { virt = true }
+status = "v1"
+mechanism = "first login seeds the no-animations and window-opaque toggles (runtime state)"
+
+[quirk.intel-video]
+source = ["install/hardware/intel/video-acceleration.sh"]
+probe = { lspci = "(VGA|3D|Display).*Intel" }
+status = "v1"
+mechanism = "hardware.graphics.extraPackages: intel-media-driver, vpl-gpu-rt (GMA: intel-vaapi-driver)"
+requires = ["pkgs.intel-media-driver", "pkgs.vpl-gpu-rt", "pkgs.intel-vaapi-driver"]
+
+[quirk.intel-thermald]
+source = ["install/hardware/intel/thermald.sh"]
+probe = { cpu_vendor = "GenuineIntel", cpu_model_min = 42, battery = true }
+status = "v1"
+mechanism = "services.thermald.enable"
+
+[quirk.intel-sof]
+source = ["install/hardware/intel/sof-firmware.sh"]
+probe = { lspci = "(Multimedia audio controller|Audio device).*Intel" }
+status = "v1"
+mechanism = "hardware.firmware = [ sof-firmware ]"
+requires = ["pkgs.sof-firmware"]
+
+[quirk.intel-ptl-fred]
+source = ["install/hardware/intel/fred.sh"]
+probe = { lspci = "(VGA|3D|Display).*Panther Lake" }
+status = "v1"
+mechanism = "boot.kernelParams fred=on"
+
+[quirk.intel-wifi7-eht]
+source = ["install/hardware/intel/fix-wifi7-eht.sh"]
+probe = { pci = ["8086:e440", "8086:272b"] }
+status = "v1"
+mechanism = "options iwlwifi disable_11be=Y"
+
+[quirk.intel-ipu7-camera]
+source = ["install/hardware/intel/ipu7-camera.sh"]
+probe = { acpi_hid = "OVTI08F4" }
+status = "v1"
+unfree = true
+mechanism = "hardware.ipu7 (nixpkgs module; ipu7-camera-bins and ivsc-firmware are unfree, so the host allows them)"
+requires = ["option:hardware.ipu7.enable", "pkgs.ipu7-camera-bins"]
+
+[quirk.asus-rog]
+source = ["install/hardware/asus-rog.sh", "install/user/hardware/asus/fix-audio-mixer.sh", "install/user/hardware/asus/fix-mic.sh"]
+probe = { "dmi.sys_vendor" = "ASUSTeK COMPUTER INC.", "dmi.product_family" = "*ROG*" }
+status = "v1"
+mechanism = "services.asusd; WirePlumber alsa-soft-mixer; one-time ALC285 mixer levels"
+requires = ["option:services.asusd.enable"]
+
+[quirk.asus-z13-touchpad]
+source = ["install/hardware/asus/fix-z13-touchpad.sh"]
+probe = { "dmi.sys_vendor" = "ASUSTeK COMPUTER INC.", "dmi.product_family" = "*ROG*", match = "GZ302" }
+status = "v1"
+mechanism = "udev rule: the detachable keyboard's touchpad is internal (disable-while-typing)"
+
+[quirk.asus-b9406-display]
+source = ["install/hardware/asus/fix-asus-ptl-b9406-display.sh"]
+probe = { match = "B9406", lspci = "(VGA|3D|Display).*Panther Lake" }
+status = "v1"
+mechanism = "boot.kernelParams xe.enable_panel_replay=0"
+
+[quirk.asus-b9406-touchpad]
+source = ["install/hardware/asus/fix-asus-ptl-b9406-touchpad.sh"]
+probe = { match = "B9406", lspci = "(VGA|3D|Display).*Panther Lake" }
+status = "v1"
+mechanism = "libinput local-overrides.quirks: mask the pressure axes"
+
+[quirk.asus-ptl-backlight]
+source = ["install/hardware/asus/fix-asus-ptl-display-backlight.sh"]
+probe = { lspci = "(VGA|3D|Display).*Panther Lake", any = [{ match = "B9406" }, { match = "ux5406aa" }] }
+status = "v1"
+mechanism = "boot.kernelParams xe.enable_dpcd_backlight=1"
+
+[quirk.framework16]
+source = ["install/hardware/framework16.sh", "install/hardware/framework/qmk-hid.sh"]
+probe = { "dmi.sys_vendor" = "Framework", match = "Laptop 16" }
+status = "v1"
+mechanism = "qmk_hid and its uaccess udev rule (nixos-hardware has per-model framework-16-* modules; the host picks one)"
+requires = ["pkgs.qmk_hid"]
+
+[quirk.framework13-amd-mic]
+source = ["install/user/hardware/framework/fix-f13-amd-audio-input.sh"]
+probe = { "dmi.sys_vendor" = "Framework", lspci = "Audio device.*(Family 17h|Family 19h)" }
+status = "v1"
+mechanism = "WirePlumber rule: card profile \"HiFi (Mic1, Mic2, Speaker)\""
+
+[quirk.lenovo-yoga-pro7-bass]
+source = ["install/hardware/lenovo/fix-yoga-pro7-bass-speakers.sh"]
+probe = { match = "Yoga Pro 7 14IAH10" }
+status = "v1"
+mechanism = "options snd-sof-intel-hda-generic hda_model=alc287-yoga9-bass-spk-pin"
+
+[quirk.surface]
+source = ["install/hardware/surface.sh", "install/hardware/fix-surface-keyboard.sh"]
+probe = { "dmi.sys_vendor" = "Microsoft Corporation", match = "Surface", x86 = true }
+status = "v1"
+nixos-hardware = "microsoft-surface-common"
+mechanism = "nixos-hardware linux-surface; the keyboard's initrd modules"
+requires = ["option:hardware.microsoft-surface.kernelVersion"]
+
+[quirk.apple-t2]
+source = ["install/hardware/apple/fix-t2.sh"]
+probe = { pci = ["106b:1801", "106b:1802"] }
+status = "v1"
+nixos-hardware = "apple-t2"
+mechanism = "nixos-hardware apple-t2 (linux-t2, firmware); upstream's suspend kernel parameters"
+requires = ["option:hardware.apple-t2.enableIGPU"]
+
+[quirk.apple-brcmfmac]
+source = ["install/hardware/apple/fix-brcmfmac-supplicant.sh"]
+probe = { x86 = true, any = [{ pci = ["106b:1801", "106b:1802"] }, { "dmi.sys_vendor" = "Apple*", pci = ["14e4:43ba", "14e4:43bb", "14e4:43bc", "14e4:43a3", "14e4:43dc", "14e4:4464", "14e4:4488", "14e4:4425", "14e4:4433"] }] }
+status = "v1"
+mechanism = "options brcmfmac feature_disable=0x82000"
+
+[quirk.apple-spi-keyboard]
+source = ["install/hardware/apple/fix-spi-keyboard.sh"]
+probe = { "dmi.product_name" = "MacBook[89],1|MacBook1[02],1|MacBookPro13,[123]|MacBookPro14,[123]" }
+status = "v1"
+mechanism = "initrd modules applespi, intel_lpss_pci, spi_pxa2xx_platform, spi_pxa2xx_pci (applespi is in-tree)"
+
+[quirk.apple-nvme-suspend]
+source = ["install/hardware/apple/fix-suspend-nvme.sh"]
+probe = { "dmi.product_name" = "MacBook8,1|MacBook9,1|MacBook10,1|MacBookPro13,[123]|MacBookPro14,[123]" }
+status = "v1"
+mechanism = "a oneshot that clears d3cold_allowed on 0000:01:00.0"
+
+[quirk.bcm43xx]
+source = ["install/hardware/fix-bcm43xx.sh"]
+probe = { pci = ["14e4:43a0", "14e4:4331"] }
+status = "v1"
+unfree = true
+mechanism = "broadcom_sta (wl), b43/bcma/ssb blacklisted; unfree and marked insecure in nixpkgs, so the host allows both"
+requires = ["pkgs.linuxPackages.broadcom_sta"]
+
+[quirk.tuxedo-backlight]
+source = ["install/hardware/fix-tuxedo-backlight.sh"]
+probe = { any = [{ "dmi.sys_vendor" = "*TUXEDO*" }, { "dmi.sys_vendor" = "*Slimbook*" }] }
+status = "v1"
+mechanism = "hardware.tuxedo-drivers; clevo_xsm_wmi blacklisted"
+requires = ["option:hardware.tuxedo-drivers.enable", "pkgs.linuxPackages.tuxedo-drivers"]
+
+[quirk.synaptics-intertouch]
+source = ["install/hardware/fix-synaptic-touchpad.sh"]
+probe = { input_name = "synaptics" }
+status = "v1"
+mechanism = "options psmouse synaptics_intertouch=1 (upstream only loads it live; omanix persists it for machines the probe matched)"
+
+[quirk.elgato-camlink-4k]
+source = ["install/hardware/fix-elgato-camlink-4k.sh"]
+probe = { usb_product = "Cam Link 4K" }
+status = "v1"
+mechanism = "v4l2loopback + a v4l2-relayd instance at 1280x720 NV12; the raw node hidden by udev"
+requires = ["option:services.v4l2-relayd.instances", "pkgs.linuxPackages.v4l2loopback"]
+
+[quirk.speaker-tuning]
+source = ["install/hardware/speaker-tuning.sh"]
+probe = { "dmi.product_sku" = "0DB9|0DBA" }
+status = "v1"
+mechanism = "a PipeWire filter-chain from default/audio/tunings/<tuning> with lsp-plugins, as a user service"
+requires = ["pkgs.lsp-plugins"]
+
+[quirk.nvidia]
+source = ["install/hardware/nvidia.sh"]
+probe = { nvidia_gpu = "any" }
+status = "v1"
+unfree = true
+mechanism = "hardware.nvidia (open kernel modules on GSP GPUs, ≥ 0x1e00), modesetting, videoDrivers; the Hyprland env is upstream's default/hypr/nvidia.lua"
+
+[quirk.hybrid-gpu]
+source = []
+probe = { gpu_count_min = 2 }
+status = "v1"
+mechanism = "services.supergfxd with upstream's 5 s start delay; omarchy-toggle-hybrid-gpu stays a GUI tool"
+requires = ["option:services.supergfxd.enable"]
+
+# ---------------------------------------------------------------- deferred
+
+[quirk.intel-lpmd]
+source = ["install/hardware/intel/lpmd.sh"]
+probe = { cpu_vendor = "GenuineIntel", cpu_model = [151, 154, 170, 172, 183, 186, 189, 191, 204], battery = true }
+status = "deferred"
+reason = "U26: nixpkgs has no intel-lpmd package or module; package it, then add the module"
+missing = ["pkgs.intel-lpmd", "option:services.intel-lpmd"]
+
+[quirk.asus-proart-p14-speakers]
+source = ["install/hardware/asus/fix-asus-proart-p14-speakers.sh"]
+probe = { match = "H7407BA" }
+status = "deferred"
+reason = "U26: asus-proart-p14-speaker-firmware is not in nixpkgs (and the H7407BA is an aarch64 N1x laptop)"
+missing = ["pkgs.asus-proart-p14-speaker-firmware"]
+
+[quirk.dell-xps13-ptl]
+source = ["install/hardware/dell-xps13-ptl-speaker-firmware.sh", "install/hardware/dell-xps13-sidecar-amps.sh", "install/user/hardware/dell/xps13-text-scaling.sh"]
+probe = { match = "DX13260" }
+status = "deferred"
+reason = "U26: linux-firmware-cirrus-dx13260 and dell-xps13-sidecar-amps are omarchy-pkgs packages not in nixpkgs"
+missing = ["pkgs.linux-firmware-cirrus-dx13260", "pkgs.dell-xps13-sidecar-amps"]
+
+[quirk.dell-xps-haptics]
+source = ["install/hardware/dell-xps-touchpad-haptics.sh"]
+probe = { match = "XPS" }
+status = "deferred"
+reason = "U26: dell-xps-touchpad-haptics is not in nixpkgs"
+missing = ["pkgs.dell-xps-touchpad-haptics"]
+
+[quirk.qualcomm]
+source = ["install/hardware/qualcomm/camera.sh", "install/hardware/qualcomm/dtb-uki.sh", "install/hardware/qualcomm/firmware.sh", "install/hardware/qualcomm/initramfs.sh", "install/hardware/qualcomm/kernel-params.sh", "install/user/hardware/qualcomm/camera.sh", "install/user/hardware/qualcomm/video-decode.sh"]
+probe = { x86 = false }
+status = "deferred"
+reason = "aarch64 (Snapdragon X): v1 targets x86_64-linux only"
+
+[quirk.yoga-slim7x]
+source = ["install/hardware/lenovo/yoga-slim7x.sh", "install/hardware/lenovo/start-yoga-slim7x-remoteprocs.sh"]
+probe = { x86 = false, match = "Yoga Slim 7x" }
+status = "deferred"
+reason = "aarch64 (Snapdragon X)"
+
+[quirk.thinkpad-t14s-camera]
+source = ["install/hardware/lenovo/thinkpad-t14s-camera.sh"]
+probe = { x86 = false, match = "T14s" }
+status = "deferred"
+reason = "aarch64 (Snapdragon X)"
+
+[quirk.n1x]
+source = ["install/hardware/n1x.sh", "install/hardware/fix-n1x-gpu-memory.sh"]
+probe = { x86 = false, pci = ["10de:2e06"] }
+status = "deferred"
+reason = "aarch64 (NVIDIA N1x)"
+
+[quirk.gb10]
+source = ["install/hardware/gb10/sleep.sh", "install/hardware/nvidia/dgx-spark-boot.sh", "install/hardware/nvidia-apps.sh"]
+probe = { x86 = false, match = "NVIDIA_DGX_Spark" }
+status = "deferred"
+reason = "aarch64 (NVIDIA GB10 / DGX Spark)"
+
+# ---------------------------------------------------------------- generic
+
+# Upstream scripts that apply to every machine, re-expressed in a base module.
+[generic]
+"install/hardware/bluetooth.sh" = "hardware/bluetooth.nix"
+"install/hardware/set-wireless-regdom.sh" = "hardware/wireless.nix"
+"install/hardware/network.sh" = "network.nix"
+"install/hardware/vulkan.sh" = "hardware/default.nix (Mesa, NixOS's default, carries RADV and ANV; NVIDIA's comes with the nvidia quirk)"
+"install/hardware/fix-fkeys.sh" = "hardware/default.nix (hid_apple fnmode=2)"
+
+# ---------------------------------------------------------------- drop
+
+[drop]
+"install/hardware/all.sh" = "dispatcher"
+"install/hardware/pacman.sh" = "pacman repositories (the T2 repo is nixos-hardware's kernel)"
+"install/hardware/platform-setup.sh" = "dispatcher"
+"install/hardware/fix-yt6801-ethernet-adapter.sh" = "empty upstream file (0 effective lines)"
+"default/systemd/system/systemd-pcrlogin@.service.d/10-omarchy-nvpcr.conf" = "U27: not adopted (interacts with loom's PCR 7 policy, D4)"
+"default/systemd/system/systemd-pcrproduct.service.d/10-omarchy-nvpcr.conf" = "U27: not adopted"
+"default/systemd/system/systemd-tpm2-setup-early.service.d/10-omarchy-nvpcr.conf" = "U27: not adopted"

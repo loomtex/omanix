@@ -18,6 +18,7 @@ in
     ./defaults.nix
     ./dns.nix
     ./fonts.nix
+    ./hardware
     ./input.nix
     ./network.nix
     ./packages.nix

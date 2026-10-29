@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omanix-hw-probe"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[project.scripts]
+omanix-hw-probe = "omanix_hw_probe:main"
+
+[tool.setuptools]
+packages = ["omanix_hw_probe"]
+
+[tool.setuptools.package-data]
+omanix_hw_probe = ["hw-quirks.toml"]

@@ -1,0 +1,80 @@
+From: Ada <ada@6bit.com>
+Date: Thu, 29 Oct 2026 01:05:00 -0600
+Subject: [PATCH] P4: monitor scaling writes the monitors.lua overlay
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+monitors.lua is a read-only home-manager file (D9). The scaling writer
+puts the panel's scale (with its mode and GDK scale) into the runtime
+overlay through `omanix-overlay hypr-scale`, and the clamshell reader
+reads the HM file and then the overlay, taking the last rule, so a
+numeric HM scale doesn't revert a panel change (DESIGN §f.4.4). The font
+and text-size writers are add/ overrides.
+---
+diff --git a/bin/omarchy-hyprland-monitor-scaling b/bin/omarchy-hyprland-monitor-scaling
+--- a/bin/omarchy-hyprland-monitor-scaling
++++ b/bin/omarchy-hyprland-monitor-scaling
+@@ -92,24 +92,15 @@
+   # GTK only honors integer GDK_SCALE values, so persist the nearest whole
+   # factor even when the monitor scale itself is fractional.
+   local new_gdk_scale="$(awk -v scale="$new_scale" 'BEGIN { printf "%d", int(scale + 0.5) }')"
+-  local monitor_lua="$HOME/.config/hypr/monitors.lua"
+ 
+   hyprctl eval "hl.monitor({ output = \"$active_monitor\", mode = \"${width}x${height}@${refresh_rate}\", position = \"auto\", scale = $new_scale })" >/dev/null
+   audit_scale_change "$requested" "$active_monitor" "$current_scale" "$new_scale"
+ 
+-  # Persist to monitors.lua if the user still has Omarchy's generic catch-all
+-  # defaults, so the scale survives reboots.
+-  if [[ -f $monitor_lua ]] && grep -q '^local omarchy_monitor_scale = ' "$monitor_lua"; then
+-    sed -i -E \
+-      -e "s|^local omarchy_monitor_scale = .*|local omarchy_monitor_scale = ${new_scale}|" \
+-      -e "s|^local omarchy_gdk_scale = .*|local omarchy_gdk_scale = ${new_gdk_scale}|" \
+-      "$monitor_lua"
+-  elif [[ -f $monitor_lua ]] && grep -Eq '^hl\.monitor\(\{ output = "", mode = "preferred", position = "auto", scale = ("auto"|[0-9.]+) \}\)' "$monitor_lua"; then
+-    sed -i -E \
+-      -e "s|^(hl\.monitor\(\{ output = \"\", mode = \"preferred\", position = \"auto\", scale = )([^ ]+)( \}\))|\\1${new_scale}\\3|" \
+-      -e 's|^hl\.env\("GDK_SCALE", ".*"\)|hl.env("GDK_SCALE", "'"$new_gdk_scale"'")|' \
+-      "$monitor_lua"
+-  fi
++  # omanix (P4): monitors.lua is a read-only HM file. The scale goes into its
++  # runtime overlay, loaded after it, so it survives reloads and reboots
++  # ("make it stick" moves it into omanix.hyprland.monitors).
++  omanix-overlay hypr-scale "$active_monitor" "$new_scale" --gdk "$new_gdk_scale" \
++    --mode "${width}x${height}@${refresh_rate}" >/dev/null
+ }
+ 
+ scale_from_current() {
+diff --git a/bin/omarchy-hyprland-monitor-clamshell b/bin/omarchy-hyprland-monitor-clamshell
+--- a/bin/omarchy-hyprland-monitor-clamshell
++++ b/bin/omarchy-hyprland-monitor-clamshell
+@@ -8,6 +8,8 @@
+ MANUAL_DISABLE_FLAG="$TOGGLES_DIR/internal-monitor-disable.lua"
+ SCALE_STATE="$TOGGLES_DIR/internal-monitor-scale"
+ MONITOR_LUA="$HOME/.config/hypr/monitors.lua"
++# omanix (P4): the runtime overlay of the read-only HM monitors.lua.
++MONITOR_OVERLAY="${XDG_STATE_HOME:-$HOME/.local/state}/omanix/overlay/hypr/monitors.lua"
+ 
+ INTERNAL=$(omarchy-hyprland-monitor-laptop)
+ 
+@@ -69,9 +71,8 @@
+ # The config with its comments cut away, so commented-out text can pose neither
+ # as a rule nor as one of its keys.
+ monitor_rules() {
+-  [[ -f $MONITOR_LUA ]] || return 0
+-
+-  sed -E -e 's/--\[\[[^]]*\]\]//g' -e 's/--.*$//' "$MONITOR_LUA"
++  # omanix (P4): the HM file, then its overlay, which Hyprland loads last.
++  cat "$MONITOR_LUA" "$MONITOR_OVERLAY" 2>/dev/null | sed -E -e 's/--\[\[[^]]*\]\]//g' -e 's/--.*$//'
+ }
+ 
+ monitor_rule_regex() {
+@@ -84,7 +85,7 @@
+ configured_monitor_value() {
+   local output="$1" key="$2" value
+ 
+-  value=$(monitor_rules | sed -nE '/'"$(monitor_rule_regex "$output")"'/s/.*[{,;[:space:]]'"$key"'[[:space:]]*=[[:space:]]*("[^"]*"|[^,;}[:space:]]+)[[:space:]]*([,;}].*)?$/\1/p' | head -1)
++  value=$(monitor_rules | sed -nE '/'"$(monitor_rule_regex "$output")"'/s/.*[{,;[:space:]]'"$key"'[[:space:]]*=[[:space:]]*("[^"]*"|[^,;}[:space:]]+)[[:space:]]*([,;}].*)?$/\1/p' | tail -1)  # the last rule wins
+   lua_scalar "$value"
+ }
+ 

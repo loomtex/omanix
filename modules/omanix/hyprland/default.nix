@@ -116,10 +116,7 @@ in
     home-manager.users.${user}.xdg.configFile = {
       "hypr/hyprland.lua".text = hyprlandLua;
       "hypr/looknfeel.lua".text = luaFile "looknfeel" looknfeel;
-      # input.lua and autostart.lua are upstream's comment templates until
-      # W17's input.nix / apps take them over (same targets, same overlays).
-      "hypr/input.lua".text = luaFile "input" "";
-      "hypr/autostart.lua".text = luaFile "autostart" "";
+      # input.lua is input.nix's, autostart.lua apps/default.nix's.
       "hypr/hyprsunset.conf".text = homeLib.withOverlay (builtins.readFile "${up}/hyprsunset.conf")
         (homeLib.include.hyprlang config.users.users.${user}.home "hypr/hyprsunset.conf");
       "hypr/xdph.conf".source = "${up}/xdph.conf";
@@ -128,8 +125,6 @@ in
     omanix.home.files = {
       ".config/hypr/hyprland.lua" = { module = "hyprland/default.nix"; overlay = "hypr/hyprland.lua"; };
       ".config/hypr/looknfeel.lua" = { module = "hyprland/default.nix"; overlay = "hypr/looknfeel.lua"; };
-      ".config/hypr/input.lua" = { module = "hyprland/default.nix"; overlay = "hypr/input.lua"; };
-      ".config/hypr/autostart.lua" = { module = "hyprland/default.nix"; overlay = "hypr/autostart.lua"; };
       ".config/hypr/hyprsunset.conf" = { module = "hyprland/default.nix"; overlay = "hypr/hyprsunset.conf"; };
       ".config/hypr/xdph.conf" = { module = "hyprland/default.nix"; };
     };

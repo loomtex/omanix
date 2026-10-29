@@ -332,18 +332,107 @@ def cmd_kv(env: Env, rel: str, key: str, value: str | None) -> None:
     atomic_write(p, kv_set(text, fmt, key, value))
 
 
+def cmd_get(env: Env, rel: str, key: str) -> str | None:
+    """A key's value in a kv overlay (None when unset)."""
+    fmt = OVERLAYS.get(rel, (None, None, None))[1]
+    if fmt is None:
+        raise SystemExit(f"omanix-overlay: {rel} is not a key/value overlay")
+    p = env.overlay / rel
+    return kv_get(p.read_text(), fmt, key) if p.exists() else None
+
+
+FONT_RE = re.compile(r"[A-Za-z0-9 _.+-]+")
+
+
+def font_document(family: str, env: Env) -> str:
+    """overlay/fontconfig/fonts.conf for `omarchy-font-set` (§f.4.4): a full
+    document whose prepend_first rule loads after the HM one, so it wins."""
+    if not FONT_RE.fullmatch(family):
+        raise SystemExit(f"omanix-overlay: bad font family {family!r}")
+    h = header("fontconfig/fonts.conf", env)
+    return (
+        '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">\n'
+        + h
+        + "<fontconfig>\n"
+        '  <match target="pattern">\n'
+        '    <test name="family" qual="any"><string>monospace</string></test>\n'
+        '    <edit name="family" mode="prepend_first" binding="strong">\n'
+        f"      <string>{family}</string>\n"
+        "    </edit>\n"
+        "  </match>\n"
+        "</fontconfig>\n"
+    )
+
+
+def cmd_font(env: Env, family: str | None) -> None:
+    rel = "fontconfig/fonts.conf"
+    atomic_write(env.overlay / rel, font_document(family, env) if family is not None else empty_overlay(rel, env))
+
+
+def font_family(env: Env) -> str | None:
+    """The family the fontconfig overlay prepends, if any."""
+    p = env.overlay / "fontconfig/fonts.conf"
+    if not p.exists():
+        return None
+    m = re.search(r'mode="prepend_first"[^>]*>\s*<string>([^<]+)</string>', p.read_text())
+    return m.group(1) if m else None
+
+
+KB_BEGIN = "-- omanix-overlay: keyboard (managed block)"
+KB_END = "-- omanix-overlay: keyboard end"
+KB_RE = re.compile(r"[A-Za-z0-9_-]*(,[A-Za-z0-9_-]*)*")
+
+
+def cmd_kb(env: Env, layouts: str | None, variants: str | None) -> None:
+    """Write (or with layouts None, remove) the keyboard layout block in
+    overlay/hypr/input.lua: the keyboard picker's runtime choice (U28),
+    loaded after the HM input.lua, so it wins over omanix.input.layouts."""
+    rel = "hypr/input.lua"
+    p = env.overlay / rel
+    text = p.read_text() if p.exists() else empty_overlay(rel, env)
+    if KB_BEGIN in text and KB_END in text:
+        a, b = text.index(KB_BEGIN), text.index(KB_END) + len(KB_END)
+        text = text[:a].rstrip("\n") + "\n" + text[b:].lstrip("\n")
+    if layouts is not None:
+        variants = variants or ""
+        if not layouts or not KB_RE.fullmatch(layouts) or not KB_RE.fullmatch(variants):
+            raise SystemExit(f"omanix-overlay: bad keyboard layouts {layouts!r} / variants {variants!r}")
+        block = "\n".join([
+            KB_BEGIN,
+            f"-- layouts {layouts}",
+            f"-- variants {variants}",
+            f'hl.config({{ input = {{ kb_layout = "{layouts}", kb_variant = "{variants}" }} }})',
+            KB_END,
+        ])
+        text = text.rstrip("\n") + "\n" + block + "\n"
+    atomic_write(p, text)
+
+
+def kb_block(text: str) -> dict | None:
+    if KB_BEGIN not in text:
+        return None
+    l = re.search(r"^-- layouts (\S*)$", text, re.M)
+    v = re.search(r"^-- variants (\S*)$", text, re.M)
+    return {"layouts": l.group(1) if l else "", "variants": v.group(1) if v else ""}
+
+
 # ---------------------------------------------------------------- hypr-scale
 
 SCALE_BEGIN = "-- omanix-overlay: monitors (managed block)"
 SCALE_END = "-- omanix-overlay: end"
 
 
-def cmd_hypr_scale(env: Env, output: str, scale: str, gdk: str | None) -> None:
+MODE_RE = re.compile(r"preferred|highres|highrr|[0-9]+x[0-9]+(@[0-9]+(\.[0-9]+)?)?")
+RULE_RE = re.compile(r"^-- rule (\S*) (\S+)(?: (\S+))?$", re.M)
+
+
+def cmd_hypr_scale(env: Env, output: str, scale: str, gdk: str | None, mode: str | None = None) -> None:
     """Write a monitor scale into overlay/hypr/monitors.lua (P4 contract).
 
-    One managed block holds a rule per output ("" = every output) and an
-    optional GDK scale; the last rule wins in Hyprland, and the block comes
-    after anything the human wrote by hand.
+    One managed block holds a rule per output ("" = every output), with the
+    mode the panel had (default "preferred"), and an optional GDK scale; the
+    last rule wins in Hyprland, and the block comes after anything the human
+    wrote by hand.
     """
     if not re.fullmatch(r"auto|[0-9]+(\.[0-9]+)?", scale):
         raise SystemExit(f"omanix-overlay: bad scale {scale!r}")
@@ -351,20 +440,21 @@ def cmd_hypr_scale(env: Env, output: str, scale: str, gdk: str | None) -> None:
         raise SystemExit(f"omanix-overlay: bad gdk scale {gdk!r}")
     if not re.fullmatch(r"[A-Za-z0-9_.:-]*", output):
         raise SystemExit(f"omanix-overlay: bad output name {output!r}")
+    if mode is not None and not MODE_RE.fullmatch(mode):
+        raise SystemExit(f"omanix-overlay: bad mode {mode!r}")
     rel = "hypr/monitors.lua"
     p = env.overlay / rel
     text = p.read_text() if p.exists() else empty_overlay(rel, env)
     pre, block, post = _split_block(text)
-    rules = dict(re.findall(r'^-- rule (\S*) (\S+)$', block, re.M))
-    rules = {("" if k == '""' else k): v for k, v in rules.items()}
+    rules = {("" if o == '""' else o): (sc, md or "preferred") for o, sc, md in RULE_RE.findall(block)}
     gdk_old = re.search(r"^-- gdk (\S+)$", block, re.M)
-    rules[output] = scale
+    rules[output] = (scale, mode or rules.get(output, (None, "preferred"))[1])
     gdk = gdk or (gdk_old.group(1) if gdk_old else None)
     lines = [SCALE_BEGIN]
-    for out, sc in rules.items():
-        lines.append(f"-- rule {out or chr(34) * 2} {sc}")
+    for out, (sc, md) in rules.items():
+        lines.append(f"-- rule {out or chr(34) * 2} {sc} {md}")
         val = f'"{sc}"' if sc == "auto" else sc
-        lines.append(f'hl.monitor({{ output = "{out}", mode = "preferred", position = "auto", scale = {val} }})')
+        lines.append(f'hl.monitor({{ output = "{out}", mode = "{md}", position = "auto", scale = {val} }})')
     if gdk:
         lines.append(f"-- gdk {gdk}")
         lines.append(f'hl.env("GDK_SCALE", "{gdk}")')
@@ -461,7 +551,8 @@ def cmd_settle(env: Env, declared: dict) -> dict:
     same value; empty whole-file overlays whose current sha is the one a
     'make it stick' change absorbed (§f.4.6).
 
-    declared = {"kv": {rel: {key: value}}, "absorbed": {area: sha}}
+    declared = {"kv": {rel: {key: value}}, "monospace": family,
+                "keyboard": {"layouts": l, "variants": v}, "absorbed": {area: sha}}
     """
     st = stamp()
     report = {"removedKeys": {}, "emptied": [], "kept": []}
@@ -480,6 +571,20 @@ def cmd_settle(env: Env, declared: dict) -> dict:
         if removed:
             atomic_write(p, text)
             report["removedKeys"][rel] = removed
+    # Typed values with their own overlay syntax (W17): the monospace family
+    # (overlay/fontconfig/fonts.conf) and the keyboard block of input.lua.
+    mono = declared.get("monospace")
+    if mono and font_family(env) == mono:
+        backup(env.overlay / "fontconfig/fonts.conf", env, st)
+        cmd_font(env, None)
+        report["removedKeys"]["fontconfig/fonts.conf"] = ["monospace"]
+    kb = declared.get("keyboard")
+    ip = env.overlay / "hypr/input.lua"
+    if kb and ip.exists():
+        cur = kb_block(ip.read_text())
+        if cur is not None and cur["layouts"] == kb.get("layouts") and cur["variants"] == (kb.get("variants") or ""):
+            cmd_kb(env, None, None)
+            report["removedKeys"]["hypr/input.lua"] = ["keyboard"]
     absorbed = declared.get("absorbed") or {}
     for area, want in absorbed.items():
         if not want:
@@ -536,8 +641,8 @@ def cmd_state(env: Env) -> dict:
     mp = env.overlay / "hypr/monitors.lua"
     if mp.exists():
         _, block, _ = _split_block(mp.read_text())
-        for out, sc in re.findall(r'^-- rule (\S*) (\S+)$', block, re.M):
-            monitors.append({"output": "" if out == '""' else out, "scale": sc})
+        for out, sc, md in RULE_RE.findall(block):
+            monitors.append({"output": "" if out == '""' else out, "scale": sc, "mode": md or "preferred"})
     shell_keys: list[str] = []
     sj = env.shell / "shell.json"
     if sj.exists():
@@ -545,8 +650,14 @@ def cmd_state(env: Env) -> dict:
             shell_keys = sorted(json.loads(sj.read_text()).keys())
         except json.JSONDecodeError:
             shell_keys = ["<invalid>"]
+    keyboard = None
+    ip = env.overlay / "hypr/input.lua"
+    if ip.exists():
+        keyboard = kb_block(ip.read_text())
     doc = {
         "schema": "omanix.runtime/v1",
+        "monospace": font_family(env),
+        "keyboard": keyboard,
         "theme": theme if theme and re.fullmatch(r"[A-Za-z0-9_.-]+", theme) else None,
         "wallpaper": os.path.realpath(bg) if bg.exists() else None,
         "monitors": monitors,
@@ -603,10 +714,16 @@ def runtime_snapshot(env: Env, area: str) -> dict:
                         k, v = (x.strip() for x in s.split("=", 1))
                         keys[f"{sec}.{k}" if sec else k] = v
             entry["keys"] = keys
+        elif rel == "hypr/input.lua" and KB_BEGIN in text:
+            entry["keyboard"] = kb_block(text)
+            a, b = text.index(KB_BEGIN), text.index(KB_END) + len(KB_END)
+            rest = body_lines(text[:a] + text[b:], rel)
+            if rest:
+                entry["text"] = "\n".join(rest) + "\n"
         elif rel == "hypr/monitors.lua" and SCALE_BEGIN in text:
             pre, block, post = _split_block(text)
-            entry["monitors"] = [{"output": "" if o == '""' else o, "scale": sc}
-                                 for o, sc in re.findall(r'^-- rule (\S*) (\S+)$', block, re.M)]
+            entry["monitors"] = [{"output": "" if o == '""' else o, "scale": sc, "mode": md or "preferred"}
+                                 for o, sc, md in RULE_RE.findall(block)]
             g = re.search(r"^-- gdk (\S+)$", block, re.M)
             if g:
                 entry["gdkScale"] = int(g.group(1))
@@ -670,10 +787,21 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("key")
     p.add_argument("value", nargs="?")
     p.add_argument("--unset", action="store_true")
+    p = sub.add_parser("get", help="print a key's value in a terminal overlay (exit 1 if unset)")
+    p.add_argument("overlay")
+    p.add_argument("key")
+    p = sub.add_parser("font", help="set the monospace family in overlay/fontconfig/fonts.conf")
+    p.add_argument("family", nargs="?")
+    p.add_argument("--unset", action="store_true")
+    p = sub.add_parser("kb", help="set the keyboard layouts in overlay/hypr/input.lua")
+    p.add_argument("layouts", nargs="?")
+    p.add_argument("variants", nargs="?", default="")
+    p.add_argument("--unset", action="store_true")
     p = sub.add_parser("hypr-scale", help="set a monitor scale in overlay/hypr/monitors.lua")
     p.add_argument("output", help='output name, or "" for every output')
     p.add_argument("scale")
     p.add_argument("--gdk")
+    p.add_argument("--mode", help='the mode to keep, e.g. 2880x1800@120 (default "preferred")')
     p = sub.add_parser("rebase", help="rebase shell.json onto the current defaults")
     p.add_argument("--defaults", type=Path)
     p = sub.add_parser("settle", help="drop overlay content now declared (after make it stick)")
@@ -697,8 +825,23 @@ def main(argv: list[str] | None = None) -> int:
     elif a.cmd == "kv":
         cmd_kv(env, a.overlay, a.key, None if a.unset else a.value)
         write_state(env)
+    elif a.cmd == "get":
+        v = cmd_get(env, a.overlay, a.key)
+        if v is None:
+            return 1
+        print(v)
+    elif a.cmd == "font":
+        if not a.unset and not a.family:
+            raise SystemExit("omanix-overlay font: give a family or --unset")
+        cmd_font(env, None if a.unset else a.family)
+        write_state(env)
+    elif a.cmd == "kb":
+        if not a.unset and not a.layouts:
+            raise SystemExit("omanix-overlay kb: give layouts or --unset")
+        cmd_kb(env, None if a.unset else a.layouts, a.variants)
+        write_state(env)
     elif a.cmd == "hypr-scale":
-        cmd_hypr_scale(env, a.output, a.scale, a.gdk)
+        cmd_hypr_scale(env, a.output, a.scale, a.gdk, a.mode)
         write_state(env)
     elif a.cmd == "rebase":
         for c in cmd_rebase(env, a.defaults):

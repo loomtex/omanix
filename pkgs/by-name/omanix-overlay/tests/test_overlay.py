@@ -110,7 +110,7 @@ def test_hypr_scale_block(env):
     assert 'output = "DP-2"' in text and 'scale = "auto"' in text
     assert 'hl.env("GDK_SCALE", "2")' in text  # kept from the first call
     state = ov.cmd_state(env)
-    assert {"output": "", "scale": "1.75"} in state["monitors"]
+    assert {"output": "", "scale": "1.75", "mode": "preferred"} in state["monitors"]
 
 
 @pytest.mark.parametrize("args", [("", "1.5); os.execute('x')", None), ('"; x', "1", None), ("", "1", "2.5")])
@@ -270,10 +270,126 @@ def test_runtime_snapshot_font_and_monitors(env):
     ov.cmd_hypr_scale(env, "", "1.5", "2")
     m = ov.runtime_snapshot(env, "monitors")
     f = m["files"][0]
-    assert f["monitors"] == [{"output": "", "scale": "1.5"}] and f["gdkScale"] == 2
+    assert f["monitors"] == [{"output": "", "scale": "1.5", "mode": "preferred"}] and f["gdkScale"] == 2
     assert "text" not in f
 
 
 def test_runtime_snapshot_unknown_area(env):
     with pytest.raises(SystemExit):
         ov.runtime_snapshot(env, "nope")
+
+
+# ---------------------------------------------------------------- W17: get, font, kb, typed settle
+
+
+def test_get_reads_kv_overlays(env):
+    ov.cmd_init(env)
+    assert ov.cmd_get(env, "kitty.conf", "font_family") is None
+    ov.cmd_kv(env, "kitty.conf", "font_family", "Iosevka")
+    ov.cmd_kv(env, "alacritty.toml", "font.normal.family", '"Iosevka"')
+    ov.cmd_kv(env, "foot.ini", "font", "Iosevka:size=11")
+    assert ov.cmd_get(env, "kitty.conf", "font_family") == "Iosevka"
+    assert ov.cmd_get(env, "alacritty.toml", "font.normal.family") == '"Iosevka"'
+    assert ov.cmd_get(env, "foot.ini", "font") == "Iosevka:size=11"
+    with pytest.raises(SystemExit):
+        ov.cmd_get(env, "hypr/input.lua", "x")
+
+
+def test_font_writes_a_prepend_first_document(env):
+    import xml.dom.minidom
+
+    ov.cmd_init(env)
+    ov.cmd_font(env, "Iosevka Nerd Font")
+    p = env.overlay / "fontconfig/fonts.conf"
+    doc = xml.dom.minidom.parse(str(p))
+    edits = doc.getElementsByTagName("edit")
+    assert edits[0].getAttribute("mode") == "prepend_first"
+    assert ov.font_family(env) == "Iosevka Nerd Font"
+    assert not ov.is_empty("fontconfig/fonts.conf", env)
+    assert "Make it stick" in p.read_text()
+    ov.cmd_font(env, None)
+    assert ov.is_empty("fontconfig/fonts.conf", env)
+    assert ov.font_family(env) is None
+
+
+@pytest.mark.parametrize("bad", ["a</string>", "x\ny", "a&b", ""])
+def test_font_refuses_markup(env, bad):
+    ov.cmd_init(env)
+    with pytest.raises(SystemExit):
+        ov.cmd_font(env, bad)
+
+
+def test_kb_block_replaces_and_keeps_hand_written_lines(env):
+    ov.cmd_init(env)
+    p = env.overlay / "hypr/input.lua"
+    p.write_text(p.read_text() + "hl.config({ input = { sensitivity = 0.3 } })\n")
+    ov.cmd_kb(env, "us,de", ",nodeadkeys")
+    ov.cmd_kb(env, "us,fr", "")
+    text = p.read_text()
+    assert text.count("managed block") == 1
+    assert 'kb_layout = "us,fr"' in text and "sensitivity = 0.3" in text
+    assert ov.kb_block(text) == {"layouts": "us,fr", "variants": ""}
+    snap = ov.runtime_snapshot(env, "input")
+    entry = next(f for f in snap["files"] if f["path"] == "overlay/hypr/input.lua")
+    assert entry["keyboard"] == {"layouts": "us,fr", "variants": ""}
+    assert "sensitivity" in entry["text"]
+    ov.cmd_kb(env, None, None)
+    assert "kb_layout" not in p.read_text() and "sensitivity = 0.3" in p.read_text()
+
+
+@pytest.mark.parametrize("layouts,variants", [('us"', ""), ("us", "a b"), ("us\nos.exit()", ""), ("", "")])
+def test_kb_refuses_lua_injection(env, layouts, variants):
+    ov.cmd_init(env)
+    with pytest.raises(SystemExit):
+        ov.cmd_kb(env, layouts, variants)
+
+
+def test_settle_typed_values(env):
+    ov.cmd_init(env)
+    ov.cmd_font(env, "Iosevka")
+    ov.cmd_kb(env, "us,de", ",")
+    ov.cmd_kv(env, "kitty.conf", "font_family", "Iosevka")
+    ov.cmd_kv(env, "kitty.conf", "font_size", "11.0")
+    rep = ov.cmd_settle(env, {
+        "kv": {"kitty.conf": {"font_family": "Iosevka", "font_size": "9.0"}},
+        "monospace": "Iosevka",
+        "keyboard": {"layouts": "us,de", "variants": ","},
+    })
+    assert rep["removedKeys"]["kitty.conf"] == ["font_family"]
+    assert ov.cmd_get(env, "kitty.conf", "font_size") == "11.0"   # differs: kept
+    assert ov.font_family(env) is None
+    assert ov.kb_block((env.overlay / "hypr/input.lua").read_text()) is None
+    # a different declared font leaves the overlay alone
+    ov.cmd_font(env, "Hack")
+    ov.cmd_settle(env, {"monospace": "Iosevka"})
+    assert ov.font_family(env) == "Hack"
+
+
+def test_state_reports_font_and_keyboard(env):
+    ov.cmd_init(env)
+    ov.cmd_font(env, "Iosevka")
+    ov.cmd_kb(env, "us", "")
+    doc = ov.cmd_state(env)
+    assert doc["monospace"] == "Iosevka"
+    assert doc["keyboard"] == {"layouts": "us", "variants": ""}
+
+
+def test_cli_get_exit_codes(env, capsys):
+    ov.cmd_init(env)
+    assert ov.main(["get", "kitty.conf", "font_size"]) == 1
+    ov.main(["kv", "kitty.conf", "font_size", "12.0"])
+    assert ov.main(["get", "kitty.conf", "font_size"]) == 0
+    assert capsys.readouterr().out.strip() == "12.0"
+
+
+def test_hypr_scale_keeps_the_panel_mode(env):
+    ov.cmd_init(env)
+    ov.cmd_hypr_scale(env, "eDP-1", "1.6", "2", "2880x1800@120.00000")
+    ov.cmd_hypr_scale(env, "eDP-1", "2", None)          # mode kept
+    ov.cmd_hypr_scale(env, "", "1", None)
+    text = (env.overlay / "hypr/monitors.lua").read_text()
+    assert 'hl.monitor({ output = "eDP-1", mode = "2880x1800@120.00000", position = "auto", scale = 2 })' in text
+    assert 'hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })' in text
+    assert ov.cmd_state(env)["monitors"][0] == {"output": "eDP-1", "scale": "2", "mode": "2880x1800@120.00000"}
+    with pytest.raises(SystemExit):
+        ov.cmd_hypr_scale(env, "eDP-1", "2", None, 'x" })')

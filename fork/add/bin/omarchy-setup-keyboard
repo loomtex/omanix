@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# omanix: replaces upstream bin/omarchy-setup-keyboard sha256 4eaac292c7b08931311c5ec6e958017c71708f0c6b6af6f9f240e7324fab181f
+# The picker writes the keyboard block of the hypr/input.lua runtime overlay
+# (omanix_keyboard.py, U28); ~/.config/omarchy/keyboard-layouts is read-only.
+
+# omarchy:summary=Select the keyboard layouts available for switching
+
+set -euo pipefail
+
+/run/current-system/sw/bin/python3 -I "$OMARCHY_PATH/default/input-methods/omanix_keyboard.py" keyboard

@@ -8,12 +8,15 @@
 
 [[writer]]
 script = "omarchy-font-set"
-writes = "overlay/{alacritty.toml,kitty.conf,ghostty.conf,foot.ini}, overlay/fontconfig/fonts.conf (after P4)"
+writes = "overlay/{alacritty.toml,kitty.conf,ghostty.conf,foot.ini}, overlay/fontconfig/fonts.conf via omanix-overlay kv/font (P4, fork/add)"
 stick = "omanix.fonts.monospace"
+dynamic = true
 
 [[writer]]
 script = "omarchy-display-text-size"
-writes = "terminal overlays, shell/shell.toml (after P4); gsettings stays app-owned"
+writes = "terminal overlays via omanix-overlay kv, .local/state/omanix/shell/shell.toml (P3 + P4, fork/add); gsettings stays app-owned"
+stick = "omanix.fonts.size (terminals)"
+dynamic = true
 
 [[writer]]
 script = "omarchy-agent-account-add"
@@ -25,52 +28,17 @@ writes = ".local/state/omarchy/toggles/hypr/ (runtime toggles)"
 
 [[writer]]
 script = "omarchy-hyprland-monitor-scaling"
-writes = "overlay/hypr/monitors.lua via omanix-overlay hypr-scale (after P4)"
+writes = "overlay/hypr/monitors.lua via omanix-overlay hypr-scale (P4, patch 0004)"
 stick = "omanix.hyprland.monitors + gdkScale"
 dynamic = true
 
 [[writer]]
 script = "omarchy-setup-keyboard"
-writes = "overlay/hypr/input.lua (W17 override, U28)"
+writes = "the keyboard block of overlay/hypr/input.lua via omanix-overlay kb (fork/add omanix_keyboard.py, U28)"
 stick = "omanix.input.layouts"
 dynamic = true
 
 # ---- pending: HM-owned writes the fork still ships ---------------------
-# P4 (W15 follow-up): the terminal font and text-size writers move to
-# `omanix-overlay kv <overlay> <key> <value>`.
-[[pending]]
-file = "bin/omarchy-font-set"
-target = ".config/alacritty/alacritty.toml"
-patch = "P4"
-[[pending]]
-file = "bin/omarchy-font-set"
-target = ".config/kitty/kitty.conf"
-patch = "P4"
-[[pending]]
-file = "bin/omarchy-font-set"
-target = ".config/ghostty/config"
-patch = "P4"
-[[pending]]
-file = "bin/omarchy-font-set"
-target = ".config/foot/foot.ini"
-patch = "P4"
-[[pending]]
-file = "bin/omarchy-display-text-size"
-target = ".config/alacritty/alacritty.toml"
-patch = "P4"
-[[pending]]
-file = "bin/omarchy-display-text-size"
-target = ".config/kitty/kitty.conf"
-patch = "P4"
-[[pending]]
-file = "bin/omarchy-display-text-size"
-target = ".config/ghostty/config"
-patch = "P4"
-[[pending]]
-file = "bin/omarchy-display-text-size"
-target = ".config/foot/foot.ini"
-patch = "P4"
-
 # W18/W19: the menu's "edit config" entries open HM-owned files; they become
 # `omanix edit <path>` (overlay, or the read-only file + the owning option).
 [[pending]]
@@ -93,6 +61,15 @@ patch = "W18 menu: omanix edit"
 file = "default/omarchy/omarchy-menu.jsonc"
 target = ".config/hypr/hyprsunset.conf"
 patch = "W18 menu: omanix edit"
-# Not HM-owned yet, so not listed: ~/.XCompose (menu edit entry) and
-# ~/.config/chromium-flags.conf (menu install action). When W17's input.nix
-# and apps own them, this check fails until they are patched or listed.
+# W17 made ~/.XCompose (input.nix) and ~/.config/chromium-flags.conf
+# (apps/default.nix) HM-owned: the menu's XCompose edit entry and its
+# Chromium-account install action (which writes an oauth flag into the file)
+# wait for W18's menu.
+[[pending]]
+file = "default/omarchy/omarchy-menu.jsonc"
+target = ".XCompose"
+patch = "W18 menu: omanix edit (overlay/xcompose)"
+[[pending]]
+file = "default/omarchy/omarchy-menu.jsonc"
+target = ".config/chromium-flags.conf"
+patch = "W18 menu: Chromium account becomes an apps intent (omanix.apps.chromium, overlay/chromium-flags.conf)"

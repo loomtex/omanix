@@ -13,6 +13,14 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Hardware quirks that build on nixos-hardware (surface, apple-t2, §f.2.6):
+    # a host imports omanix.inputs.nixos-hardware.nixosModules.<x> next to the
+    # quirk.
+    nixos-hardware = {
+      url = "github:NixOS/nixos-hardware";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # D2: the fork point. Untrusted data: read and built in the sandbox, never executed.
     omarchy = {
       url = "github:omacom/omarchy/5978d93ae7da0a325b7493501911e3f1266cadd3"; # v4.5.0-rc2
@@ -21,7 +29,7 @@
   };
 
   outputs =
-    inputs@{ self, nixpkgs, loom, omarchy }:
+    inputs@{ self, nixpkgs, loom, omarchy, ... }:
     let
       inherit (nixpkgs) lib;
       # v1 targets x86_64-linux only (§f.2.3).

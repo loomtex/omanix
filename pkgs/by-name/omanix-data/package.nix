@@ -9,6 +9,9 @@
 #   default/omarchy/omarchy-menu.jsonc   upstream menu + omanix.menu.items
 #   default/omanix/language              omanix.language (OMARCHY_LANGUAGE_FILE)
 #   default/omanix/release               omanix.release
+#   themes/                              the theme registry (W16, omanix-themes)
+#   bin/omarchy-theme-set                with omanix.theme.lock: a guard that
+#                                        only sets the declared theme (W16)
 {
   lib,
   runCommand,
@@ -19,6 +22,9 @@
   language ? "en",
   release ? "0.1.0-dev",
   menuText ? null, # the merged menu (lib.menu.appendItems), or null for upstream's
+  omanixThemes ? null, # the theme registry (W16); null keeps omarchy-src's themes/
+  omanixThemeLock ? null, # omanix.theme.lock: the only theme omarchy-theme-set may set
+  omanixHiddenMenuItems ? [ ], # menu ids hidden with "when": "false" (W16: theme lock)
 }:
 
 let
@@ -37,6 +43,22 @@ let
   '';
   settingsJson = writeText "omanix-shell-settings.json" (builtins.toJSON shellSettings);
   menu = if menuText == null then null else writeText "omarchy-menu.jsonc" menuText;
+
+  # omanix.theme.lock (§f.5): the picker and the menu still call
+  # omarchy-theme-set; only the declared theme gets through.
+  themeGuard = writeText "omarchy-theme-set" ''
+    #!/bin/sh
+    # omanix: generated (omanix.theme.lock). The theme is fixed by the host
+    # configuration (omanix.theme.default); this refuses any other.
+    want=$(printf '%s' "''${1-}" | sed -E 's/<[^>]+>//g' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+    if [ "$want" != ${lib.escapeShellArg omanixThemeLock} ]; then
+      msg="The theme is locked to ${omanixThemeLock} by this computer's configuration. Ask ''${OMANIX_AGENT_NAME:-your agent} to change omanix.theme."
+      echo "omarchy-theme-set: $msg" >&2
+      command -v notify-send >/dev/null && notify-send -u normal "Theme locked" "$msg" >/dev/null 2>&1
+      exit 1
+    fi
+    exec ${omarchy-src}/bin/omarchy-theme-set "$@"
+  '';
 in
 runCommand "omanix-data-${release}"
   {
@@ -73,6 +95,41 @@ runCommand "omanix-data-${release}"
     ${lib.optionalString (menu != null) ''
       rm $out/default/omarchy/omarchy-menu.jsonc
       install -m644 ${menu} $out/default/omarchy/omarchy-menu.jsonc
+    ''}
+
+    ${lib.optionalString (omanixThemes != null) ''
+      rm -rf $out/themes
+      mkdir $out/themes
+      cp -rs --no-preserve=mode ${omanixThemes}/. $out/themes/
+    ''}
+
+    ${lib.optionalString (omanixThemeLock != null) ''
+      rm $out/bin/omarchy-theme-set
+      install -m755 ${themeGuard} $out/bin/omarchy-theme-set
+      patchShebangs $out/bin/omarchy-theme-set
+    ''}
+
+    ${lib.optionalString (omanixHiddenMenuItems != [ ]) ''
+      m=$out/default/omarchy/omarchy-menu.jsonc
+      python3 -I - "$(readlink -f $m)" $m.new ${lib.escapeShellArgs omanixHiddenMenuItems} <<'EOF'
+      import json, re, sys
+      src, out, *hide = sys.argv[1:]
+      row = re.compile(r'^(\s*)("(?:[^"\\]|\\.)*")(\s*:\s*)(\{.*\})(,?)\s*$')
+      lines, seen = [], set()
+      for line in open(src, encoding="utf-8").read().split("\n"):
+          m = row.match(line)
+          if m and json.loads(m.group(2)) in hide:
+              obj = json.loads(m.group(4))
+              obj["when"] = "false"
+              line = m.group(1) + m.group(2) + m.group(3) + json.dumps(obj, ensure_ascii=False, separators=(",", ":")) + m.group(5)
+              seen.add(json.loads(m.group(2)))
+          lines.append(line)
+      missing = sorted(set(hide) - seen)
+      if missing:
+          sys.exit("omanix-data: menu rows to hide not found: " + ", ".join(missing))
+      open(out, "w", encoding="utf-8").write("\n".join(lines))
+      EOF
+      rm $m && mv $m.new $m
     ''}
 
     mkdir -p $out/default/omanix

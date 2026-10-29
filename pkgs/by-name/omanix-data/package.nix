@@ -51,6 +51,12 @@ runCommand "omanix-data-${release}"
     cp -rs --no-preserve=mode ${omarchy-src}/. $out/
     chmod -R u+w $out
 
+    # The shell is copied, not linked: its plugin registry scans for manifests
+    # with `find -type f`, which skips symlinks (no plugin, the menu included,
+    # would load), and QML resolves imports next to the file it really is.
+    rm -rf $out/shell
+    cp -r --no-preserve=mode ${omarchy-src}/shell $out/shell
+
     install -Dm644 ${overlayLoader} $out/default/hypr/omanix-overlay.lua
 
     rm $out/config/omarchy/shell.json

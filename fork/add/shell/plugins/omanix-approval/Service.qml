@@ -543,11 +543,14 @@ Item {
       }
 
       // A press anywhere on the card is the human choosing to use it; the
-      // press still reaches the control under it.
+      // press still reaches the control under it. The keyboard is taken a
+      // moment later: Hyprland releases every mouse button when a layer turns
+      // exclusive, which would cancel the click in progress.
       MouseArea {
         anchors.fill: parent
-        onPressed: function(mouse) { root.engaged = true; mouse.accepted = false }
+        onPressed: function(mouse) { engageTimer.restart(); mouse.accepted = false }
       }
+      Timer { id: engageTimer; interval: 250; onTriggered: if (root.cardShown) root.engaged = true }
     }
   }
 

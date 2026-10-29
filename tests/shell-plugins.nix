@@ -107,6 +107,12 @@ pkgs.testers.runNixOSTest {
         diag(); raise
     machine.sleep(3)
 
+    def dump():
+        print(machine.execute("id ${user}; ls -la /run/nuketown-approval /run/nuketown-approval/* /run/nuketown-broker 2>&1; head -c 300 /tmp/answer-* 2>&1; "
+          + "ls -laR /run/user/${uid}/omanix-approval 2>&1; "
+          + "su - ${user} -c " + shlex.quote("${env} systemctl --user status nuketown-broker --no-pager; ${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval state") + " 2>&1; "
+          + "journalctl -b --no-pager _UID=${uid} | grep -i 'broker\\|prompt\\|approval\\|qml\\|omanix' | tail -60")[1])
+
     def no_plugin_errors():
         out = machine.execute("journalctl -b --no-pager _UID=${uid} | grep -i 'omanix' | grep -i 'error\\|failed\\|is not a type\\|not defined\\|cannot assign\\|unable'")[1]
         assert out.strip() == "", out
@@ -153,7 +159,7 @@ pkgs.testers.runNixOSTest {
             return d
 
         def request(rid):
-            machine.succeed(f"(printf 'REQUEST:{rid}\\n\\n' | socat -t 600 - UNIX-CONNECT:/run/nuketown-broker/socket > /tmp/answer-{rid}) >/dev/null 2>&1 &")
+            machine.succeed(f"(printf 'REQUEST:{rid}\\n\\n' | socat STDIO,ignoreeof UNIX-CONNECT:/run/nuketown-broker/socket > /tmp/answer-{rid}) >/dev/null 2>&1 &")
 
         def answer(rid):
             machine.wait_until_succeeds(f"test -s /tmp/answer-{rid}", timeout=30)
@@ -164,7 +170,10 @@ pkgs.testers.runNixOSTest {
         with subtest("root-command card: drawn, then Approve -> APPROVED"):
             fixture("root-command", "w18-root")
             request("w18-root")
-            machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval state") + " | grep -q '\"shown\":\"card\"'", timeout=30)
+            try:
+                machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval state") + " | grep -q '\"shown\":\"card\"'", timeout=30)
+            except Exception:
+                dump(); raise
             s = state("omanix.approval")
             assert s["form"] == "root" and s["engaged"] is False, s
             machine.sleep(2)
@@ -178,7 +187,10 @@ pkgs.testers.runNixOSTest {
         with subtest("full change card: Deny with reason -> DENIED:<reason>"):
             fixture("full", "w18-full")
             request("w18-full")
-            machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval state") + " | grep -q '\"form\":\"full\"'", timeout=30)
+            try:
+                machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval state") + " | grep -q '\"form\":\"full\"'", timeout=30)
+            except Exception:
+                dump(); raise
             machine.sleep(2)
             machine.screenshot("card-full")
             click("card.diff")
@@ -198,14 +210,19 @@ pkgs.testers.runNixOSTest {
             assert answer("w18-routine") == "APPROVED"
 
         with subtest("no shell: the prompter falls back to zenity"):
+            # omarchy-launch-shell relaunches a shell that exits: stop it first.
+            machine.succeed("pkill -u ${user} -f omarchy-launch-shell || true")
             machine.succeed("pkill -u ${user} -f 'quickshell .*-p /run/current-system/omarchy/shell' || true")
             machine.wait_until_fails("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval ping"), timeout=30)
             fixture("root-command", "w18-zenity")
             request("w18-zenity")
-            machine.wait_until_succeeds("pgrep -u ${user} -x zenity", timeout=30)
+            try:
+                machine.wait_until_succeeds("pgrep -u ${user} -f 'zenity --question'", timeout=30)
+            except Exception:
+                print(machine.execute("cat /tmp/answer-w18-zenity; ps -u ${user} -o pid,args | grep -i 'zenity\\|prompt'")[1]); dump(); raise
             machine.sleep(2)
             machine.screenshot("fallback-zenity")
-            machine.succeed("pkill -u ${user} -x zenity")
+            machine.succeed("pkill -u ${user} -f 'zenity --question'")
             assert answer("w18-zenity").startswith("DENIED"), answer("w18-zenity")
       '';
 
@@ -215,7 +232,7 @@ pkgs.testers.runNixOSTest {
             machine.succeed(f"mkdir -p /run/nuketown-approval && rm -rf {d} && cp -r ${fixtures}/{name} {d} && chown -R root:nuketown-approval-read {d} && chmod -R u+w,g+rX,o-rwx {d} && chmod 2750 {d}")
 
         def request(rid):
-            machine.succeed(f"(printf 'REQUEST:{rid}\\n\\n' | socat -t 600 - UNIX-CONNECT:/run/nuketown-broker/socket > /tmp/answer-{rid}) >/dev/null 2>&1 &")
+            machine.succeed(f"(printf 'REQUEST:{rid}\\n\\n' | socat STDIO,ignoreeof UNIX-CONNECT:/run/nuketown-broker/socket > /tmp/answer-{rid}) >/dev/null 2>&1 &")
 
         def typed():
             return machine.succeed("cat /tmp/typed 2>/dev/null || true")
@@ -242,9 +259,13 @@ pkgs.testers.runNixOSTest {
 
         with subtest("a click into the card gives it the keyboard; deciding gives it back"):
             click("card.deny")
+            print(state("omanix.approval"))
             assert state("omanix.approval")["engaged"] is True
             machine.send_chars("not now\n")
-            machine.wait_until_succeeds("test -s /tmp/answer-w18-focus", timeout=20)
+            try:
+                machine.wait_until_succeeds("test -s /tmp/answer-w18-focus", timeout=20)
+            except Exception:
+                print(typed()); dump(); raise
             assert machine.succeed("cat /tmp/answer-w18-focus").strip() == "DENIED:not now"
             assert "not now" not in typed(), typed()
             machine.sleep(1)
@@ -317,7 +338,7 @@ pkgs.testers.runNixOSTest {
             s = state("omanix.status")
             assert s["offline"] is True and s["visible"] is True, s
             machine.succeed("mkdir -p /run/nuketown-approval && rm -rf /run/nuketown-approval/w18-bar && cp -r ${fixtures}/root-command /run/nuketown-approval/w18-bar && chown -R root:nuketown-approval-read /run/nuketown-approval/w18-bar && chmod -R g+rX /run/nuketown-approval/w18-bar")
-            machine.succeed("(printf 'REQUEST:w18-bar\\n\\n' | socat -t 600 - UNIX-CONNECT:/run/nuketown-broker/socket > /tmp/answer-bar) >/dev/null 2>&1 &")
+            machine.succeed("(printf 'REQUEST:w18-bar\\n\\n' | socat STDIO,ignoreeof UNIX-CONNECT:/run/nuketown-broker/socket > /tmp/answer-bar) >/dev/null 2>&1 &")
             machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.status state") + " | grep -q '\"pending\":1'", timeout=30)
             machine.sleep(1)
             machine.screenshot("bar-indicators")

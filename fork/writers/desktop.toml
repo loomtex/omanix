@@ -1,0 +1,98 @@
+# KEEP-AS-GUI tools that write at runtime, and where (§f.4.4).
+# checks.runtime-writers: every KEEP-AS-GUI script with a literal write under
+# ~/.config or ~/.local/state has a [[writer]] row. checks.hm-owned-readonly:
+# no shipped write site targets an HM-owned file, except the [[pending]]
+# rows, each naming the patch that fixes it (stale rows fail the check).
+# `dynamic = true` marks a writer whose paths are computed (the scanner
+# can't see them); its row is still the record.
+
+[[writer]]
+script = "omarchy-font-set"
+writes = "overlay/{alacritty.toml,kitty.conf,ghostty.conf,foot.ini}, overlay/fontconfig/fonts.conf (after P4)"
+stick = "omanix.fonts.monospace"
+
+[[writer]]
+script = "omarchy-display-text-size"
+writes = "terminal overlays, shell/shell.toml (after P4); gsettings stays app-owned"
+
+[[writer]]
+script = "omarchy-agent-account-add"
+writes = ".config/omarchy/defaults/agent (the human's own harness default; user data)"
+
+[[writer]]
+script = "omarchy-refresh-hyprland"
+writes = ".local/state/omarchy/toggles/hypr/ (runtime toggles)"
+
+[[writer]]
+script = "omarchy-hyprland-monitor-scaling"
+writes = "overlay/hypr/monitors.lua via omanix-overlay hypr-scale (after P4)"
+stick = "omanix.hyprland.monitors + gdkScale"
+dynamic = true
+
+[[writer]]
+script = "omarchy-setup-keyboard"
+writes = "overlay/hypr/input.lua (W17 override, U28)"
+stick = "omanix.input.layouts"
+dynamic = true
+
+# ---- pending: HM-owned writes the fork still ships ---------------------
+# P4 (W15 follow-up): the terminal font and text-size writers move to
+# `omanix-overlay kv <overlay> <key> <value>`.
+[[pending]]
+file = "bin/omarchy-font-set"
+target = ".config/alacritty/alacritty.toml"
+patch = "P4"
+[[pending]]
+file = "bin/omarchy-font-set"
+target = ".config/kitty/kitty.conf"
+patch = "P4"
+[[pending]]
+file = "bin/omarchy-font-set"
+target = ".config/ghostty/config"
+patch = "P4"
+[[pending]]
+file = "bin/omarchy-font-set"
+target = ".config/foot/foot.ini"
+patch = "P4"
+[[pending]]
+file = "bin/omarchy-display-text-size"
+target = ".config/alacritty/alacritty.toml"
+patch = "P4"
+[[pending]]
+file = "bin/omarchy-display-text-size"
+target = ".config/kitty/kitty.conf"
+patch = "P4"
+[[pending]]
+file = "bin/omarchy-display-text-size"
+target = ".config/ghostty/config"
+patch = "P4"
+[[pending]]
+file = "bin/omarchy-display-text-size"
+target = ".config/foot/foot.ini"
+patch = "P4"
+
+# W18/W19: the menu's "edit config" entries open HM-owned files; they become
+# `omanix edit <path>` (overlay, or the read-only file + the owning option).
+[[pending]]
+file = "default/omarchy/omarchy-menu.jsonc"
+target = ".config/hypr/monitors.lua"
+patch = "W18 menu: omanix edit"
+[[pending]]
+file = "default/omarchy/omarchy-menu.jsonc"
+target = ".config/hypr/bindings.lua"
+patch = "W18 menu: omanix edit"
+[[pending]]
+file = "default/omarchy/omarchy-menu.jsonc"
+target = ".config/hypr/input.lua"
+patch = "W18 menu: omanix edit"
+[[pending]]
+file = "default/omarchy/omarchy-menu.jsonc"
+target = ".config/hypr/hyprland.lua"
+patch = "W18 menu: omanix edit"
+[[pending]]
+file = "default/omarchy/omarchy-menu.jsonc"
+target = ".config/hypr/hyprsunset.conf"
+patch = "W18 menu: omanix edit"
+# Not HM-owned yet, so not listed: ~/.XCompose (menu edit entry) and
+# ~/.config/chromium-flags.conf (menu install action). When W17's input.nix
+# and apps own them, this check fails until they are patched or listed.

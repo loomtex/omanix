@@ -1331,3 +1331,11 @@ from = "/usr/bin/(?!omarchy-)([A-Za-z0-9_][A-Za-z0-9_.+-]*[A-Za-z0-9_+])(?![A-Za
 to = "/run/current-system/sw/bin/\\1"
 count = 1
 
+
+# W15 (§f.4.4 "Terminal reload"): alacritty watches its imports, so touching
+# the overlay (the last import) reloads it without writing the HM-owned file.
+[[rewrite]]
+file = "bin/omarchy-restart-terminal"
+from = "  touch ~/.config/alacritty/alacritty.toml"
+to = "  touch \"${XDG_STATE_HOME:-$HOME/.local/state}/omanix/overlay/alacritty.toml\""
+count = 1

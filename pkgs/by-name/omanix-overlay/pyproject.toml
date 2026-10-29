@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omanix-overlay"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[project.scripts]
+omanix-overlay = "omanix_overlay:main"
+omanix-runtime-snapshot = "omanix_overlay:snapshot_main"
+
+[tool.setuptools]
+packages = ["omanix_overlay"]

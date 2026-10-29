@@ -15,11 +15,30 @@ let
   alacrittyUp = builtins.fromTOML (builtins.readFile "${up}/alacritty/alacritty.toml");
   alacrittyTheme = lib.head alacrittyUp.general.import;
 
+  # omanix.fonts (fonts.nix) in each terminal's own syntax; upstream's lines
+  # are replaced in place, so the overlay still comes last.
+  font = cfg.fonts.monospace;
+  size = toString cfg.fonts.size;
+  alacrittyFont = {
+    font = lib.mapAttrs (_: v: if builtins.isAttrs v then v // { family = font; } else v) alacrittyUp.font
+      // { size = cfg.fonts.size; };
+  };
+  replaceLine = prefix: line: text: lib.concatStringsSep "\n"
+    (map (l: if lib.hasPrefix prefix l then line else l) (lib.splitString "\n" text));
+  kittyConf = builtins.readFile "${up}/kitty/kitty.conf" + ''
+
+    # omanix.fonts (fonts.nix)
+    font_family ${font}
+    font_size ${size}.0
+  '';
+  ghosttyConf = replaceLine "font-size =" "font-size = ${size}"
+    (replaceLine "font-family =" "font-family = \"${font}\"" (builtins.readFile "${up}/ghostty/config"));
+
   # foot: `include=` must be the last key of [main] (a later section in the
   # main file still wins for that section).
   footIni =
     let
-      lines = lib.splitString "\n" (builtins.readFile "${up}/foot/foot.ini");
+      lines = lib.splitString "\n" (replaceLine "font=" "font=${font}:size=${size}" (builtins.readFile "${up}/foot/foot.ini"));
       idx = lib.findFirst (i: i > 0 && lib.hasPrefix "[" (builtins.elemAt lines i)) (builtins.length lines)
         (lib.range 0 (builtins.length lines - 1));
       before = lib.take idx lines;
@@ -40,12 +59,12 @@ in
       '';
       "alacritty/omanix-base.toml".source = toml.generate "omanix-base.toml"
         (builtins.removeAttrs alacrittyUp [ "general" "font" ]);
-      # [font] from omanix.fonts (W17's fonts.nix); upstream's until then.
-      "alacritty/omanix.toml".source = toml.generate "omanix.toml" { inherit (alacrittyUp) font; };
+      # [font] from omanix.fonts (fonts.nix).
+      "alacritty/omanix.toml".source = toml.generate "omanix.toml" alacrittyFont;
 
-      "kitty/kitty.conf".text = homeLib.withOverlay (builtins.readFile "${up}/kitty/kitty.conf")
+      "kitty/kitty.conf".text = homeLib.withOverlay kittyConf
         (homeLib.include.kitty home "kitty.conf");
-      "ghostty/config".text = homeLib.withOverlay (builtins.readFile "${up}/ghostty/config")
+      "ghostty/config".text = homeLib.withOverlay ghosttyConf
         (homeLib.include.ghostty home "ghostty.conf");
       "foot/foot.ini".text = footIni;
     };

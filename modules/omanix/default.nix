@@ -12,7 +12,18 @@ in
   _file = ./default.nix;
 
   imports = [
+    ./apps
+    ./audio.nix
     ./branding.nix
+    ./defaults.nix
+    ./dns.nix
+    ./fonts.nix
+    ./input.nix
+    ./network.nix
+    ./packages.nix
+    ./power.nix
+    ./printing.nix
+    ./region.nix
     ./fork.nix
     ./health.nix
     ./home

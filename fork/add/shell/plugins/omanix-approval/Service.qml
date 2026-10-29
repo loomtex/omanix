@@ -303,14 +303,16 @@ Item {
       Keys.onEscapePressed: { root.denyOpen = false; root.engaged = false }
 
       Flickable {
+        id: cardFlick
         anchors.fill: parent
         anchors.margins: Style.space(16)
+        contentWidth: width
         contentHeight: cardColumn.implicitHeight
         clip: true
 
         Column {
           id: cardColumn
-          width: parent.width
+          width: cardFlick.width
           spacing: Style.space(10)
 
           Item {
@@ -550,7 +552,7 @@ Item {
   }
 
   PasswdDialog {
-    open: root.passwdOpen
-    onClosed: root.passwdOpen = false
+    shown: root.passwdOpen
+    onDismissed: root.passwdOpen = false
   }
 }

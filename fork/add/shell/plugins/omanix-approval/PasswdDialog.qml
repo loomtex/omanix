@@ -14,13 +14,13 @@ import qs.Commons as Commons
 PanelWindow {
   id: root
 
-  property bool open: false
-  signal closed()
+  property bool shown: false
+  signal dismissed()
 
   property string status: ""
   property bool busy: false
 
-  visible: open
+  visible: shown
   implicitWidth: Style.space(440)
   implicitHeight: column.implicitHeight + Style.space(32)
   color: "transparent"
@@ -70,7 +70,7 @@ PanelWindow {
     }
   }
 
-  Timer { id: closeTimer; interval: 2500; onTriggered: root.closed() }
+  Timer { id: closeTimer; interval: 2500; onTriggered: root.dismissed() }
 
   Rectangle {
     anchors.fill: parent
@@ -78,7 +78,7 @@ PanelWindow {
     color: Commons.Color.popups.background
     border.width: Math.max(1, Style.space(2))
     border.color: Commons.Color.popups.border
-    Keys.onEscapePressed: root.closed()
+    Keys.onEscapePressed: root.dismissed()
 
     Column {
       id: column
@@ -108,7 +108,7 @@ PanelWindow {
         placeholderText: "New password"
         enabled: !root.busy
         onAccepted: second.forceActiveFocus()
-        Keys.onEscapePressed: root.closed()
+        Keys.onEscapePressed: root.dismissed()
       }
       TextField {
         id: second
@@ -117,7 +117,7 @@ PanelWindow {
         placeholderText: "Again"
         enabled: !root.busy
         onAccepted: root.submit()
-        Keys.onEscapePressed: root.closed()
+        Keys.onEscapePressed: root.dismissed()
       }
       Text {
         width: parent.width
@@ -131,7 +131,7 @@ PanelWindow {
       Row {
         anchors.right: parent.right
         spacing: Style.space(8)
-        CardButton { text: "Cancel"; onClicked: root.closed() }
+        CardButton { text: "Cancel"; onClicked: root.dismissed() }
         CardButton { text: "Change password"; primary: true; onClicked: root.submit() }
       }
     }

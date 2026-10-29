@@ -178,11 +178,11 @@
         "sops-nix": "sops-nix"
       },
       "locked": {
-        "lastModified": 1793256697,
-        "narHash": "sha256-kxJliI2QpqLmERM/0rqediu2IGDnJ7nHrlRNaaohsfo=",
+        "lastModified": 1793303509,
+        "narHash": "sha256-u7Rj0L6tiPAVAEauBLClH5GdRagLKxeT3z52o6LMPB8=",
         "ref": "v2-skeleton",
-        "rev": "f2e3d719c181713241d356d7f6f7c05630644960",
-        "revCount": 49,
+        "rev": "4a6fe3deb88215524f6ba611b38706bed48090b1",
+        "revCount": 55,
         "type": "git",
         "url": "file:///agents/ada/projects/loom"
       },

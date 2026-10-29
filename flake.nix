@@ -5,6 +5,14 @@
     # D1: the whole omanix stack is on nixos-unstable (Hyprland >= 0.56).
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
+    # loom: platform + agent base (§0.3). LOCAL DEV PIN: the v2-skeleton branch
+    # in the sibling checkout (W0, W5, W6, W11). Replace with the silo/github
+    # URL (a release tag) once loom v2 is published.
+    loom = {
+      url = "git+file:///agents/ada/projects/loom?ref=v2-skeleton";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # D2: the fork point. Untrusted data: read and built in the sandbox, never executed.
     omarchy = {
       url = "github:omacom/omarchy/5978d93ae7da0a325b7493501911e3f1266cadd3"; # v4.5.0-rc2
@@ -13,7 +21,7 @@
   };
 
   outputs =
-    { self, nixpkgs, omarchy }:
+    inputs@{ self, nixpkgs, loom, omarchy }:
     let
       inherit (nixpkgs) lib;
       # v1 targets x86_64-linux only (§f.2.3).
@@ -22,21 +30,32 @@
       pkgsFor = system: import nixpkgs {
         inherit system;
         overlays = [ self.overlays.default ];
+        config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [ "claude-code" ];
       };
       byName = builtins.attrNames (builtins.readDir ./pkgs/by-name);
+      omanixLib = import ./lib { inherit inputs; omanix = self; };
     in
     {
+      # loom.lib plus omanix's mkHost, lua, jsonc, menu and fork (§b.2).
+      lib = omanixLib;
+
       # Every pkgs/by-name/<name>/package.nix, plus the fork data they share.
       overlays.default = final: prev: {
         omanixFork = import ./lib/fork.nix { inherit lib omarchy; };
       } // lib.genAttrs byName (name: final.callPackage ./pkgs/by-name/${name}/package.nix { });
+
+      # The omanix base; omanix.lib.mkHost adds it after loom's bundle.
+      nixosModules.default = import ./modules/omanix { omanix = self; };
+
+      # Reference hosts: fixtures for checks and cache seeds (§b.2).
+      nixosConfigurations = import ./hosts { inherit inputs; omanix = self; };
 
       packages = forAllSystems (system:
         let pkgs = pkgsFor system; in
         lib.genAttrs byName (name: pkgs.${name}) // { default = pkgs.omarchy-src; });
 
       checks = forAllSystems (system:
-        import ./checks { pkgs = pkgsFor system; inherit self; });
+        import ./checks { pkgs = pkgsFor system; inherit self inputs; });
 
       apps = forAllSystems (system: import ./apps { pkgs = pkgsFor system; });
 

@@ -17,12 +17,12 @@ in
     services.printing = {
       enable = lib.mkDefault true;
       browsed.enable = lib.mkDefault true;
+      # etc/cups/cups-browsed.conf: queues only for driverless printers.
+      browsedConf = lib.mkDefault ''
+        CreateIPPPrinterQueues Driverless
+        CreateRemoteCUPSPrinterQueues No
+      '';
     };
-    # etc/cups/cups-browsed.conf: queues only for driverless printers.
-    environment.etc."cups/cups-browsed.conf".text = lib.mkDefault ''
-      CreateIPPPrinterQueues Driverless
-      CreateRemoteCUPSPrinterQueues No
-    '';
     services.avahi = {
       enable = lib.mkDefault true;
       nssmdns4 = lib.mkDefault true;

@@ -114,8 +114,11 @@ pkgs.testers.runNixOSTest {
         machine.succeed("test -e /run/current-system/sw/share/applications/YouTube.desktop")
         machine.succeed("grep -q 'Exec=omarchy-launch-webapp https://linear.app' /run/current-system/sw/share/applications/Linear.desktop")
         machine.succeed("test -e /run/current-system/sw/share/applications/chromium.desktop")
+        # The bind is declared in the HM bindings.lua; Hyprland holds a Lua
+        # function for it, so `hyprctl binds` shows its chord and description.
+        machine.succeed("grep -q 'https://linear.app' ${home}/.config/hypr/bindings.lua")
         binds = s("hyprctl -j binds")
-        assert "https://linear.app" in binds, "the web app's keybinding is missing"
+        assert '"Linear"' in binds, "the web app's keybinding is not loaded"
         machine.succeed("grep -q -- '--enable-features=.*WebUIDarkMode' ${home}/.config/chromium-flags.conf")
         machine.succeed("tail -n1 ${home}/.config/chromium-flags.conf | grep -q 'omanix/overlay/chromium-flags.conf'")
 

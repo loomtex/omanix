@@ -58,7 +58,8 @@ pkgs.testers.runNixOSTest {
               machine.wait_until_succeeds("pgrep -u sddm -f '[s]ddm-greeter'", timeout=T(120))
           except Exception:
               diag(); raise
-          machine.succeed("grep -q '^Current=omarchy' /etc/sddm.conf")
+          # the greeter was started with upstream's theme
+          machine.succeed("pgrep -u sddm -af 'sddm-greeter' | grep -q 'themes/omarchy'")
           machine.sleep(5)
           machine.screenshot("greeter")
 

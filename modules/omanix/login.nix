@@ -29,5 +29,14 @@ in
       package = lib.mkDefault pkgs.kdePackages.sddm;
     };
     environment.systemPackages = [ theme ];
+
+    # Upstream's theme has only a password field: it logs in as SDDM's last
+    # user, which a fresh install doesn't have ("user unknown"). Seed it with
+    # the human once (tmpfiles `f` never overwrites; /var/lib/sddm persists).
+    services.displayManager.sddm.settings.Users.RememberLastUser = lib.mkDefault true;
+    systemd.tmpfiles.rules = [
+      "d /var/lib/sddm 0750 sddm sddm -"
+      "f /var/lib/sddm/state.conf 0600 sddm sddm - [Last]\\nUser=${config.loom.user.name}\\n"
+    ];
   };
 }

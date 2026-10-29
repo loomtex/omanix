@@ -55,7 +55,8 @@ let
   # At every login with the lock: back to the declared theme (and background).
   relock = pkgs.writeShellScript "omanix-theme-relock" ''
     set -u
-    export PATH=${bin}:$PATH
+    # the session's PATH, not the unit's minimal one
+    export PATH=${bin}:/run/wrappers/bin:/etc/profiles/per-user/$USER/bin:/run/current-system/sw/bin:$PATH
     state="''${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current"
     if [ "$(cat "$state/theme.name" 2>/dev/null)" != ${lib.escapeShellArg cfg.theme.default} ]; then
       OMARCHY_THEME_WAIT=1 omarchy-theme-set ${lib.escapeShellArg cfg.theme.default} </dev/null \

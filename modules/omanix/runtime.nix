@@ -44,15 +44,17 @@ let
     fi
     ${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update || true
     # §f.4.5 step 3, §f.5: the declared theme (theme/default.nix). Hyprland
-    # and the shell start after this unit, so they come up themed.
+    # and the shell start after this unit, so they come up themed. The
+    # theme scripts need the session's PATH, not the unit's minimal one.
+    themePath="${cfg.path}/bin:/run/wrappers/bin:/etc/profiles/per-user/$USER/bin:/run/current-system/sw/bin:$PATH"
     ${lib.optionalString (!cfg.theme.intros) ''
       mkdir -p "$HOME/.local/state/omarchy/toggles"
       touch "$HOME/.local/state/omarchy/toggles/background-intros-off"
     ''}
-    OMARCHY_THEME_WAIT=1 PATH="${cfg.path}/bin:$PATH" omarchy-theme-set ${lib.escapeShellArg cfg.theme.default} </dev/null \
+    OMARCHY_THEME_WAIT=1 PATH="$themePath" omarchy-theme-set ${lib.escapeShellArg cfg.theme.default} </dev/null \
       || echo "omanix: the first-login theme did not apply" >&2
     ${lib.optionalString (cfg.theme.background != null) ''
-      PATH="${cfg.path}/bin:$PATH" omarchy-theme-bg-set ${lib.escapeShellArg "${cfg.theme.background}"} || true
+      PATH="$themePath" omarchy-theme-bg-set ${lib.escapeShellArg "${cfg.theme.background}"} || true
     ''}
     mkdir -p "$(dirname "$done_flag")"
     touch "$done_flag"

@@ -1,0 +1,71 @@
+From: Ada <ada@6bit.com>
+Date: Thu, 29 Oct 2026 01:11:21 -0600
+Subject: [PATCH] P7: no passwordless-sudo indicator; omanix.status and omanix.chat in the bar
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+omanix has no passwordless sudo (D8): the PasswordlessSudo indicator leaves the
+default list and the manifest (the file itself is dropped, fork/drop-paths.txt).
+The default shell.json puts omanix.status (approval pending, agent offline)
+beside the indicators and omanix.chat in omarchy.agents' slot (DESIGN §f.2.5
+P7, §h.3.1).
+---
+ config/omarchy/shell.json                          | 5 ++++-
+ shell/plugins/bar/widgets/Indicators.manifest.json | 5 -----
+ shell/plugins/bar/widgets/Indicators.qml           | 3 ++-
+ 3 files changed, 6 insertions(+), 7 deletions(-)
+
+diff --git a/config/omarchy/shell.json b/config/omarchy/shell.json
+index 3ede057..343147e 100644
+--- a/config/omarchy/shell.json
++++ b/config/omarchy/shell.json
+@@ -19,6 +19,9 @@
+       "centerBegin": [
+         {
+           "id": "omarchy.indicators"
++        },
++        {
++          "id": "omanix.status"
+         }
+       ],
+       "center": [
+@@ -48,7 +51,7 @@
+           "id": "omarchy.keyboard-layout"
+         },
+         {
+-          "id": "omarchy.agents"
++          "id": "omanix.chat"
+         },
+         {
+           "id": "omarchy.bluetooth"
+diff --git a/shell/plugins/bar/widgets/Indicators.manifest.json b/shell/plugins/bar/widgets/Indicators.manifest.json
+index a2447aa..0da2896 100644
+--- a/shell/plugins/bar/widgets/Indicators.manifest.json
++++ b/shell/plugins/bar/widgets/Indicators.manifest.json
+@@ -26,11 +26,6 @@
+         "placeholderText": "Search indicators...",
+         "emptyText": "No indicators",
+         "options": [
+-          {
+-            "value": "PasswordlessSudo",
+-            "label": "Passwordless sudo",
+-            "description": "Warning while passwordless root access is enabled"
+-          },
+           {
+             "value": "ScreenRecording",
+             "label": "Screen recording",
+diff --git a/shell/plugins/bar/widgets/Indicators.qml b/shell/plugins/bar/widgets/Indicators.qml
+index 82c82f1..5d6d8e2 100644
+--- a/shell/plugins/bar/widgets/Indicators.qml
++++ b/shell/plugins/bar/widgets/Indicators.qml
+@@ -8,7 +8,8 @@ BarWidget {
+   id: root
+   moduleName: "omarchy.indicators"
+ 
+-  readonly property var defaultIndicatorEntries: [ "PasswordlessSudo", "ScreenRecording", "RemoteSession", "Reminder", "NightLight", "Dnd", "StayAwake" ]
++  // omanix (P7): no passwordless sudo; approval and agent state are omanix.status.
++  readonly property var defaultIndicatorEntries: [ "ScreenRecording", "RemoteSession", "Reminder", "NightLight", "Dnd", "StayAwake" ]
+   readonly property var indicatorEntries: indicatorEntriesFromSettings(settings)
+   property var activeIndicatorIds: []
+   property var indicatorActiveStates: ({})

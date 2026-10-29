@@ -1,0 +1,102 @@
+From: Ada <ada@6bit.com>
+Date: Thu, 29 Oct 2026 01:11:21 -0600
+Subject: [PATCH] P14: crash diagnosis, config editing and app installers ask the agent
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+omarchy-crash-watch's toast pre-fills a diagnose-crash request; the config
+editor hands an HM-owned (read-only) file to omanix edit, or asks; the
+1Password/Signal/Spotify launchers ask to install instead of running an
+installer (DESIGN §f.2.5 P14).
+---
+ bin/omarchy-crash-watch          | 11 ++++++-----
+ bin/omarchy-launch-1password     |  3 ++-
+ bin/omarchy-launch-config-editor |  8 ++++++++
+ bin/omarchy-launch-signal        |  3 ++-
+ bin/omarchy-launch-spotify       |  3 ++-
+ 5 files changed, 20 insertions(+), 8 deletions(-)
+
+diff --git a/bin/omarchy-crash-watch b/bin/omarchy-crash-watch
+index 10f5ec0..aa46021 100644
+--- a/bin/omarchy-crash-watch
++++ b/bin/omarchy-crash-watch
+@@ -42,7 +42,9 @@ announce() {
+     --glyph "$CRASH_GLYPH" \
+     "$(omarchy-i18n crash.processCrashed "$comm")" \
+     "$(omarchy-i18n crash.diagnose)" \
+-    --exec omarchy-agent-crash "$pid" "$comm" "$exe" "$signal"
++    --exec omarchy-shell omanix.chat prefill "$(jq -cn --arg c "$comm" --arg p "$pid" --arg e "$exe" --arg s "$signal" \
++      '{source: "crash", id: "diagnose-crash", skill: "diagnose-crash",
++        text: ("\($c) crashed (pid \($p), \($e), \($s)). Why, and can you fix it?")}')"
+ }
+ 
+ # -n 0 so a restart does not re-announce crashes already dealt with.
+@@ -63,10 +65,9 @@ journalctl -f -n 0 -o json "MESSAGE_ID=$COREDUMP_MESSAGE_ID" 2>/dev/null |
+ 
+     [[ $pid =~ ^[0-9]+$ ]] || continue
+ 
+-    # The toast only offers a diagnosis, so it has nothing to offer until an
+-    # agent is chosen. Checked per crash, not at startup, so picking one takes
+-    # effect without restarting this service.
+-    [[ -n $(omarchy-default-agent) ]] || continue
++    # omanix (P14): the diagnosis is a request to the resident (the chat
++    # panel shows the Do-it-yourself view when there is none), so every
++    # crash of this user's processes is offered.
+ 
+     # Only this user's crashes; a daemon dumping core is a sysadmin's problem.
+     [[ $uid =~ ^[0-9]+$ ]] || continue
+diff --git a/bin/omarchy-launch-1password b/bin/omarchy-launch-1password
+index 61889fd..482bbee 100644
+--- a/bin/omarchy-launch-1password
++++ b/bin/omarchy-launch-1password
+@@ -10,5 +10,6 @@ set -e
+ if omarchy-cmd-present 1password; then
+   exec setsid uwsm-app -- 1password --force-device-scale-factor=1
+ else
+-  exec omarchy-launch-floating-terminal-with-presentation omarchy-install-service-1password
++  # omanix (P14): installing is a request to the agent.
++  exec omarchy-shell omanix.chat prefill '{"source":"launch","id":"install.service.1password","skill":"apps","text":"Install 1Password."}'
+ fi
+diff --git a/bin/omarchy-launch-config-editor b/bin/omarchy-launch-config-editor
+index fb10199..7ca4f8c 100644
+--- a/bin/omarchy-launch-config-editor
++++ b/bin/omarchy-launch-config-editor
+@@ -11,5 +11,13 @@ if [[ -z $path ]]; then
+   exit 1
+ fi
+ 
++# omanix (P14): an HM-owned file is read-only (a link into the store). Its
++# runtime overlay or owning option is `omanix edit`; without the CLI, ask.
++if [[ $(readlink -f -- "$path") == /nix/store/* ]]; then
++  command -v omanix >/dev/null && exec omanix edit "$path"
++  exec omarchy-shell omanix.chat prefill "$(jq -cn --arg p "$path" \
++    '{source: "config-editor", id: "setup.config", skill: "look", text: ("Change my settings in " + $p + ": ")}')"
++fi
++
+ omarchy-notification-send -u low "$(omarchy-i18n config.editing)" "$path"
+ exec omarchy-launch-editor "$path"
+diff --git a/bin/omarchy-launch-signal b/bin/omarchy-launch-signal
+index 31d94cc..302b6fc 100644
+--- a/bin/omarchy-launch-signal
++++ b/bin/omarchy-launch-signal
+@@ -11,5 +11,6 @@ if [[ -n $WINDOW_ADDRESS ]]; then
+ elif [[ -x /usr/bin/signal-desktop ]]; then
+   exec setsid uwsm-app -- /usr/bin/signal-desktop
+ else
+-  exec omarchy-launch-floating-terminal-with-presentation omarchy-install-service-signal
++  # omanix (P14): installing is a request to the agent.
++  exec omarchy-shell omanix.chat prefill '{"source":"launch","id":"install.service.signal","skill":"apps","text":"Install Signal."}'
+ fi
+diff --git a/bin/omarchy-launch-spotify b/bin/omarchy-launch-spotify
+index 1110a19..397d755 100644
+--- a/bin/omarchy-launch-spotify
++++ b/bin/omarchy-launch-spotify
+@@ -13,5 +13,6 @@ elif [[ -x /usr/bin/spotify ]]; then
+ elif [[ -f $HOME/.local/share/applications/Spotify.desktop ]]; then
+   exec omarchy-launch-webapp "https://open.spotify.com/"
+ else
+-  exec omarchy-launch-floating-terminal-with-presentation omarchy-install-service-spotify
++  # omanix (P14): installing is a request to the agent.
++  exec omarchy-shell omanix.chat prefill '{"source":"launch","id":"install.service.spotify","skill":"apps","text":"Install Spotify."}'
+ fi

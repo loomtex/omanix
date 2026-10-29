@@ -45,3 +45,6 @@ test
 .gitignore
 .greptile
 .luarc.json
+
+# W18 (P7): no passwordless sudo on omanix (D8).
+shell/plugins/bar/indicators/PasswordlessSudo.qml

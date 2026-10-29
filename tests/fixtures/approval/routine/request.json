@@ -1,0 +1,6 @@
+{"id":"20261029T101500-7f3a","requester":"ada","origin":"agent","time":"2026-10-29T10:15:00Z","cwd":"/agents/ada/projects/host","why":"install steam and set it up for gaming",
+ "kind":{"name":"loom-switch","review_prompt":null},"prompt_timeout":0,
+ "run_as":{"user":"root","group":"","login":false,"shell":false,"set_home":false},
+ "argv":["/run/current-system/sw/bin/loom-switch","--proposal","/agents/ada/.cache/loom/proposals/20261029T101455-1c2d3e4f5a6b","/nix/store/0000000000000000000000000000000a-nixos-system-kestrel"],
+ "exec_argv":["/run/current-system/sw/bin/loom-switch","--proposal","/agents/ada/.cache/loom/proposals/20261029T101455-1c2d3e4f5a6b","/nix/store/0000000000000000000000000000000a-nixos-system-kestrel"],
+ "display":"/run/current-system/sw/bin/loom-switch --proposal /agents/ada/.cache/loom/proposals/20261029T101455-1c2d3e4f5a6b /nix/store/0000000000000000000000000000000a-nixos-system-kestrel","decrypt":[],"snapshots":[]}

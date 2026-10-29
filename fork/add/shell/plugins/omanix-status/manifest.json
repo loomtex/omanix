@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "omanix.status",
+  "name": "Approvals and agent status",
+  "version": "1.0.0",
+  "author": "omanix",
+  "license": "MIT",
+  "description": "Bar indicators: an approval card is waiting; the agent is offline or signed out.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Approvals",
+    "description": "Shows when an approval card is waiting or the agent can't be reached.",
+    "category": "Status",
+    "allowMultiple": false,
+    "defaultSection": "centerBegin"
+  }
+}

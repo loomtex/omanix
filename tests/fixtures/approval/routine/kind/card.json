@@ -1,0 +1,3 @@
+{"n":7,"tip":"1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d","base":"9f8e7d6c5b4a39281706f5e4d3c2b1a098765432","out":"/nix/store/0000000000000000000000000000000a-nixos-system-kestrel","prev":"/nix/store/0000000000000000000000000000000b-nixos-system-kestrel",
+ "kind":"change","title":"install steam and set it up for gaming","request":"install steam and set it up for gaming","flags":[],"flagLine":"",
+ "packages":"+3 (steam 1.0.0.81, steam-run 1.0.0.81, gamemode 1.8.2) · 0 removed · 2 upgraded","files":["configuration.nix"],"lastRejection":null,"notLoomSwitched":false,"full":false}

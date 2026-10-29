@@ -1,0 +1,13 @@
+┌─ ada wants to run a command as root ───────────────────────────────────────────────────┐
+│ ADA'S STATED REASON                                                                    │
+│   “wifi keeps dropping; reset the driver and NetworkManager”                           │
+├─ AI REVIEW · can be wrong ─────────────────────────────────────────────────────────────┤
+│ Runs fix-wifi.sh (snapshot, 14 lines) as root.                                         │
+│   1. restarts NetworkManager (lines 3-4)                                               │
+│   2. reloads the iwlwifi driver with power saving off until reboot (lines 6-7)         │
+│   3. deletes every saved Wi-Fi network (line 9), which the reason doesn't mention      │
+│ Can't see: nothing.  Risk: MEDIUM.  Recommends: LOOK CLOSER                            │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ [Show command and script]                                                              │
+│                                         [Deny with reason…]   [Approve]                │
+└────────────────────────────────────────────────────────────────────────────────────────┘

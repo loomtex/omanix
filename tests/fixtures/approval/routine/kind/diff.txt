@@ -1,0 +1,12 @@
+diff --git a/configuration.nix b/configuration.nix
+index 3b18e51..b6fc4c2 100644
+--- a/configuration.nix
++++ b/configuration.nix
+@@ -12,6 +12,9 @@
+   omanix.theme.default = "tokyo-night";
+ 
++  programs.steam.enable = true;
++  programs.gamemode.enable = true;
++
+   # host settings below this line
+ }

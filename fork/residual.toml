@@ -22,11 +22,6 @@ kind = "usr-path"
 count = 1
 owner = "W15"
 [[site]]
-file = "bin/omarchy-crash-watch"
-kind = "calls:omarchy-agent-crash"
-count = 1
-owner = "W15"
-[[site]]
 file = "bin/omarchy-debug"
 kind = "omarchy-org"
 count = 2
@@ -67,11 +62,6 @@ kind = "calls:omarchy-hyprland-reload-guard"
 count = 1
 owner = "W15"
 [[site]]
-file = "bin/omarchy-launch-1password"
-kind = "calls:omarchy-install-service-1password"
-count = 1
-owner = "W15"
-[[site]]
 file = "bin/omarchy-launch-battlenet"
 kind = "calls:omarchy-install-gaming-battlenet"
 count = 1
@@ -85,16 +75,6 @@ owner = "W15"
 file = "bin/omarchy-launch-openclaw"
 kind = "calls:omarchy-install-openclaw-cli"
 count = 2
-owner = "W15"
-[[site]]
-file = "bin/omarchy-launch-signal"
-kind = "calls:omarchy-install-service-signal"
-count = 1
-owner = "W15"
-[[site]]
-file = "bin/omarchy-launch-spotify"
-kind = "calls:omarchy-install-service-spotify"
-count = 1
 owner = "W15"
 [[site]]
 file = "bin/omarchy-menu-keybindings"
@@ -757,23 +737,8 @@ kind = "usr-path"
 count = 1
 owner = "W18"
 [[site]]
-file = "shell/plugins/bar/indicators/PasswordlessSudo.qml"
-kind = "calls:omarchy-sudo-passwordless"
-count = 3
-owner = "W18"
-[[site]]
-file = "shell/plugins/bar/widgets/SystemUpdate.qml"
-kind = "calls:omarchy-update"
-count = 1
-owner = "W18"
-[[site]]
 file = "shell/plugins/clipboard/capture.sh"
 kind = "calls:omarchy-language"
-count = 1
-owner = "W18"
-[[site]]
-file = "shell/plugins/image-picker/ImagePicker.qml"
-kind = "calls:omarchy-theme-remove"
 count = 1
 owner = "W18"
 [[site]]

@@ -36,8 +36,38 @@ let
     open(out, "w").write(t)
   '';
   refusals = [ "missing-row" "dropped-script" "unknown-skill" "bad-template" "empty-text" "stale-row" ];
+
+  # The card goldens (§h.4): the plugin's own CardModel.js renders the fixture
+  # request directories; the model and its text form must equal
+  # tests/golden/cards/<name>.{json,txt} (regenerate: tests/golden/update-cards.sh).
+  cardGolden = name: pkgs.runCommand "omanix-check-card-golden-${name}" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
+    node ${../tests/cards/render.js} ${pkgs.omarchy-src}/shell/plugins/omanix-approval/CardModel.js \
+      ${../tests/fixtures/approval}/${name} got
+    diff -u ${../tests/golden/cards}/${name}.json got.json
+    diff -u ${../tests/golden/cards}/${name}.txt got.txt
+    cat got.txt
+    touch $out
+  '';
+
+  vm = variant: import ../tests/shell-plugins.nix { inherit pkgs variant; inherit (inputs) loom; omanix = self; };
 in
 {
+  # The chat's Markdown subset escapes the agent's text; chips follow the rules.
+  chat-model = pkgs.runCommand "omanix-check-chat-model" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
+    node ${../tests/cards/chat-model.js} ${pkgs.omarchy-src}/shell/plugins/omanix-chat/ChatModel.js ${../data/chips/rules.json}
+    touch $out
+  '';
+
+  card-golden-routine = cardGolden "routine";
+  card-golden-full = cardGolden "full";
+  card-golden-root-command = cardGolden "root-command";
+
+  # VM tests (§i.2): U10, U13, the card and the intents on the desktop.
+  chat-socket = vm "chat-socket";
+  approval-card = vm "approval-card";
+  approval-focus = vm "approval-focus";
+  desktop-intents = vm "desktop-intents";
+
   menu-intents = pkgs.runCommand "omanix-check-menu-intents" { nativeBuildInputs = [ py ]; } ''
     check() { python3 -I ${f}/tools/menu.py check ${upstreamMenu} "$1" ${f}/menu-extra.jsonc ${data}/bin; }
     check ${f}/intents.toml

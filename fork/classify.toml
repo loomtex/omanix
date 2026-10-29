@@ -585,6 +585,9 @@ stale_at_pin = []
 # Non-bin paths: first matching regex (full match) wins.
 [[path]]
 class = "DROP"
+regex = "shell/plugins/bar/indicators/PasswordlessSudo\\.qml"
+[[path]]
+class = "DROP"
 regex = "migrations/.*"
 [[path]]
 class = "ASSET"

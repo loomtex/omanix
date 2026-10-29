@@ -1,0 +1,14 @@
+{
+  "schema": "omanix.chips/v1",
+  "comment": "Suggestion chips above an empty chat composer (DESIGN §h.6). Evaluated in the human's session against local facts from omanix-chat-facts, never by the agent; at most four show, in this order. `when` is one of overlay, failedUnit, updatePending, rolledBack, newDevice, firstDays. {area} {unit} {device} {agent} are filled from the fact and the resident's name. `chip` is the button, `text` what it puts in the composer (unsent).",
+  "rules": [
+    { "id": "rolled-back", "when": "rolledBack", "chip": "What went wrong with my last change?", "text": "What went wrong with my last change? It was rolled back." },
+    { "id": "failed-unit", "when": "failedUnit", "chip": "Why did {unit} fail?", "text": "Why did {unit} fail?" },
+    { "id": "update", "when": "updatePending", "chip": "What's in this update?", "text": "What's in the update that's waiting for me?" },
+    { "id": "make-it-stick", "when": "overlay", "chip": "Make {area} stick", "text": "Make my current {area} settings permanent." },
+    { "id": "device", "when": "newDevice", "chip": "Set up {device}", "text": "Set up my {device}." },
+    { "id": "what-can-i-change", "when": "firstDays", "days": 7, "chip": "What can I change?", "text": "What can I change on this computer?" },
+    { "id": "tour", "when": "firstDays", "days": 7, "chip": "Show me around", "text": "Show me around." },
+    { "id": "install-app", "when": "firstDays", "days": 7, "chip": "Install an app", "text": "Install " }
+  ]
+}

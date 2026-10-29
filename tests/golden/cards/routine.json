@@ -1,0 +1,53 @@
+{
+  "id": "20261029T101500-7f3a",
+  "kind": "change",
+  "form": "routine",
+  "title": "Approve a change to this computer",
+  "pendingText": "",
+  "banner": {
+    "icon": "⛉",
+    "quote": "“install steam and set it up for gaming”",
+    "packages": "+3 pkgs",
+    "reviewer": "Reviewer: matches"
+  },
+  "requestHeading": "YOUR REQUEST (as ada relayed it)",
+  "requestText": "install steam and set it up for gaming",
+  "changes": [
+    {
+      "label": "Packages",
+      "text": "+3 (steam 1.0.0.81, steam-run 1.0.0.81, gamemode 1.8.2) · 0 removed · 2 upgraded"
+    },
+    {
+      "label": "Files",
+      "text": "configuration.nix"
+    },
+    {
+      "label": "Build",
+      "text": "ok"
+    }
+  ],
+  "review": {
+    "state": "ok",
+    "heading": "AI REVIEW · can be wrong",
+    "summary": "Enables programs.steam with the 32-bit graphics it needs and adds gamemode. Nothing else changes.",
+    "risk": "low",
+    "recommendation": "approve",
+    "recWord": "APPROVE",
+    "notes": [],
+    "notShown": [],
+    "reason": ""
+  },
+  "buttons": [
+    {
+      "id": "diff",
+      "label": "Show git diff"
+    },
+    {
+      "id": "nvd",
+      "label": "nvd diff"
+    }
+  ],
+  "approveLabel": "Approve",
+  "denyLabel": "Deny with reason…",
+  "detailsOpen": false
+}

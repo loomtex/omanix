@@ -1,0 +1,46 @@
+From: Ada <ada@6bit.com>
+Date: Thu, 29 Oct 2026 01:11:21 -0600
+Subject: [PATCH] P10: DNS presets in the network panel ask the agent
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+DNS is declared (omanix.dns.provider); a preset pre-fills the network intent
+through omanix.chat. Wi-Fi, band and the captive portal are unchanged
+(DESIGN §f.2.5 P10).
+---
+ shell/plugins/panels/network/Panel.qml | 20 ++++++--------------
+ 1 file changed, 6 insertions(+), 14 deletions(-)
+
+diff --git a/shell/plugins/panels/network/Panel.qml b/shell/plugins/panels/network/Panel.qml
+index fc9ff58..bd7b581 100644
+--- a/shell/plugins/panels/network/Panel.qml
++++ b/shell/plugins/panels/network/Panel.qml
+@@ -769,21 +769,13 @@ Panel {
+     return command
+   }
+ 
++  // omanix (P10): DNS is declared (omanix.dns.provider), so a preset pre-fills
++  // the agent chat with the network intent; omarchy-dns only reads it.
+   function setDns(provider) {
+-    if (!root.bar || !provider || actionProc.running) return
+-
+-    if (provider === "Custom") {
+-      var launcher = "omarchy-launch-floating-terminal-with-presentation"
+-      root.bar.run(launcher + " " + Util.shellQuote(root.dnsCommand(provider)))
+-      root.close()
+-      return
+-    }
+-
+-    // The panel stays open, so the choice can be seen taking hold and another
+-    // tried without reopening it.
+-    root.pendingDnsProvider = provider
+-    actionProc.command = ["bash", "-c", root.dnsCommand(provider)]
+-    actionProc.running = true
++    if (!root.bar || !provider) return
++    var text = provider === "DHCP" ? "Use DNS from DHCP." : (provider === "Custom" ? "Use custom DNS servers: " : "Use " + provider + " DNS.")
++    IpcRegistry.call("omanix.chat", "prefill", [JSON.stringify({ source: "network", id: "setup.network.dns." + provider.toLowerCase(), text: text, skill: "network", path: "Network › DNS › " + provider })])
++    root.close()
+   }
+ 
+   function requiresCredentials(security) {

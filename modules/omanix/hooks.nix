@@ -1,7 +1,7 @@
 # omanix.hooks.<name>: declared hooks (post-boot, theme-set, font-set, …).
 # ~/.config/omarchy/hooks/ is user data and never HM-owned, so declared
 # hooks go to /etc/omanix/hooks/<name>; omarchy-hook runs them before the
-# user's own (that part of omarchy-hook is a fork patch, see W15 notes).
+# user's own (fork/add/bin/omarchy-hook).
 { config, lib, ... }:
 
 let

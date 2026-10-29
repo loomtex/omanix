@@ -51,13 +51,6 @@ to = "/run/current-system/sw/bin/\\1"
 count = 2
 
 [[rewrite]]
-file = "bin/omarchy-setup-keyboard"
-regex = true
-from = "/usr/bin/(?!omarchy-)([A-Za-z0-9_][A-Za-z0-9_.+-]*[A-Za-z0-9_+])(?![A-Za-z0-9_.+-])"
-to = "/run/current-system/sw/bin/\\1"
-count = 1
-
-[[rewrite]]
 file = "bin/omarchy-theme-set-browser-policy"
 regex = true
 from = "/usr/bin/(omarchy-[a-z0-9][a-z0-9-]*[a-z0-9])(?![A-Za-z0-9_-])"

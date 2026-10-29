@@ -86,15 +86,19 @@ in
 
       # §f.4.5 step 3: mimeapps.list is app-owned; only fix the browser when it
       # differs. xdg-settings needs no session bus for the generic desktop
-      # (it writes mimeapps.list through xdg-mime), so this works at boot (U35).
+      # (it writes mimeapps.list through xdg-mime), so this works at boot (U35);
+      # it does need the browser's Exec on PATH and the desktop files on
+      # XDG_DATA_DIRS, which HM activation doesn't have.
       home.activation.omanixDefaults = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
         xdg() {
-          env -u BROWSER XDG_CURRENT_DESKTOP= PATH=${lib.makeBinPath [ pkgs.xdg-utils pkgs.coreutils pkgs.gnugrep pkgs.gnused pkgs.gawk pkgs.findutils pkgs.which ]}:$PATH \
+          env -u BROWSER XDG_CURRENT_DESKTOP= PATH=${lib.makeBinPath [ pkgs.xdg-utils pkgs.coreutils pkgs.gnugrep pkgs.gnused pkgs.gawk pkgs.findutils pkgs.which ]}:/etc/profiles/per-user/${user}/bin:/run/current-system/sw/bin:$PATH \
             XDG_DATA_DIRS=/etc/profiles/per-user/${user}/share:/run/current-system/sw/share ${xdgSettings} "$@"
         }
+        mkdir -p "''${XDG_CONFIG_HOME:-$HOME/.config}"
         current=$(xdg get default-web-browser 2>/dev/null || true)
         if [ "$current" != ${lib.escapeShellArg browser.desktop} ]; then
-          run xdg set default-web-browser ${lib.escapeShellArg browser.desktop} || true
+          run xdg set default-web-browser ${lib.escapeShellArg browser.desktop} \
+            || echo "omanixDefaults: could not set the default browser to ${browser.desktop}" >&2
         fi
       '';
     });

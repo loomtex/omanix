@@ -123,10 +123,13 @@ pkgs.testers.runNixOSTest {
         machine.succeed("tail -n1 ${home}/.config/chromium-flags.conf | grep -q 'omanix/overlay/chromium-flags.conf'")
 
     with subtest("defaults: readers, xdg-settings (set at activation, U35), xdg-terminal-exec"):
-        assert s("omarchy-default-terminal").strip() == "alacritty"
-        assert s("omarchy-default-browser").strip() == "chromium"
-        assert s("omarchy-default-editor").strip() == "nvim"
-        assert s("env -u BROWSER XDG_CURRENT_DESKTOP= xdg-settings get default-web-browser").strip() == "chromium.desktop"
+        v = s("omarchy-default-terminal").strip(); assert v == "alacritty", v
+        v = s("omarchy-default-browser").strip(); assert v == "chromium", v
+        v = s("omarchy-default-editor").strip(); assert v == "nvim", v
+        got = s("env -u BROWSER XDG_CURRENT_DESKTOP= xdg-settings get default-web-browser").strip()
+        if got != "chromium.desktop":
+            print(machine.execute("journalctl -b --no-pager -u home-manager-${user}.service | tail -n 40; cat ${home}/.config/mimeapps.list")[1])
+        assert got == "chromium.desktop", f"default browser: {got!r}"
         machine.succeed("test -f ${home}/.config/mimeapps.list && ! test -L ${home}/.config/mimeapps.list")
         assert s("xdg-terminal-exec --print-id").strip().startswith("Alacritty.desktop")
         machine.succeed("test -L ${home}/.config/xdg-terminals.list")

@@ -1,5 +1,5 @@
 # `nix flake check` is the gate (§i). Fork checks read only the pinned tree.
-{ pkgs, self }:
+{ pkgs, self, inputs ? { } }:
 
 let
   inherit (pkgs) lib omanixFork python3;
@@ -40,5 +40,6 @@ in
   # Stage 6 runs inside the build; this keeps it in the check list.
   omarchy-src = pkgs.omarchy-src;
 }
+// import ./desktop.nix { inherit pkgs self inputs; }
 // lib.mapAttrs' (n: v: lib.nameValuePair "pkg-${n}" v)
   (lib.filterAttrs (n: _: n != "default") self.packages.${pkgs.system})

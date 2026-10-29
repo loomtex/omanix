@@ -90,7 +90,8 @@ pkgs.testers.runNixOSTest {
             p = "${home}/" + t
             link = machine.succeed(f"readlink {p}").strip()
             assert link.startswith(files + "/"), f"{t} is not a link into the current generation: {link}"
-            machine.fail(f"su - ${user} -c 'echo >> {p}'")
+            if t != ".config/btop/themes/current.theme":   # an out-of-store link into theme state, by design
+                machine.fail(f"su - ${user} -c 'echo >> {p}'")
 
     def no_configerrors():
         out = s("hyprctl configerrors").strip()

@@ -70,4 +70,16 @@
     option = "loom.persist.system.directories";
     reason = "a list that only appends (loom's baseline uses the same rule)";
   }
+  {
+    option = "systemd.services.omanix-";
+    reason = "omanix's own system units (W16: the browser policy writer)";
+  }
+  {
+    option = "systemd.paths.omanix-";
+    reason = "omanix's own system path units (W16: the browser color spool)";
+  }
+  {
+    option = "users.groups.omanix-spool";
+    reason = "omanix's own group (the human may write the browser color spool)";
+  }
 ]

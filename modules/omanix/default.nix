@@ -28,6 +28,9 @@ in
     ./runtime.nix
     ./session.nix
     ./shell.nix
+    ./theme
+    ./browser-policy.nix
+    ./apps/chromium.nix
     ./weather.nix
   ];
 

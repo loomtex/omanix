@@ -23,7 +23,7 @@ in
     data = lib.mkOption {
       type = lib.types.package;
       readOnly = true;
-      default = pkgs.omanix-data.override {
+      default = pkgs.omanix-data.override ({
         omarchy-src = cfg.fork.package;
         shellSettings = cfg.shell.settings;
         inherit (cfg) language release;
@@ -32,9 +32,15 @@ in
           else (import ../../lib/menu.nix { inherit lib; }).appendItems
             (builtins.readFile "${cfg.fork.package}/default/omarchy/omarchy-menu.jsonc")
             cfg.menu.items;
-      };
+      } // cfg.fork.dataArgs);
       defaultText = lib.literalExpression "pkgs.omanix-data with this host's options";
       description = "`$OMARCHY_PATH`: the fork plus the files generated from this host's options (§f.2.9).";
+    };
+    dataArgs = lib.mkOption {
+      type = lib.types.attrsOf lib.types.anything;
+      default = { };
+      internal = true;
+      description = "More arguments for omanix-data from other omanix modules (theme/default.nix: the registry and the lock).";
     };
   };
 }

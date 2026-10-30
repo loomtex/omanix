@@ -91,6 +91,10 @@ pkgs.testers.runNixOSTest {
     omanix.session.autologin = lib.mkForce (variant == "try-preview" || variant == "cli-contract");
     omanix.welcome.autoOpen = false;
     loom.agent.harness = lib.mkForce "replay";
+    loom.chat.replay.script = pkgs.writeText "cli.jsonl" ''
+      {"on": "user"}
+      {"text": "ok"}
+    '';
     loom.switch.watchdog.timeout = 20;
 
     nix.settings = {
@@ -114,7 +118,7 @@ pkgs.testers.runNixOSTest {
   };
 
   testScript = ''
-    import json, shlex
+    import json
 
     REG = json.load(open("${../pkgs/by-name/omanix-cli/commands.json}"))
     MIRROR = None
@@ -280,6 +284,7 @@ pkgs.testers.runNixOSTest {
       '';
 
       try-preview = ''
+        import shlex
         HY = "export XDG_RUNTIME_DIR=/run/user/${uid} HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/${uid}/hypr | head -n1); "
 
         machine.wait_until_succeeds("su - ${user} -c " + shlex.quote(HY + "hyprctl -j monitors"), timeout=300)

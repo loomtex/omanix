@@ -1,13 +1,22 @@
-# Developer apps (§f.2.7). Both run on a developer machine; neither executes
-# anything from an omarchy tree.
-{ pkgs }:
+# apps (§b.2). configure, flash-usb and verify-release are what
+# scripts/*.sh exec after their preamble (§e.10); porting-report and
+# fork-mirror are developer apps (§f.2.7). None executes anything from an
+# omarchy tree.
+{ pkgs, omanix }:
 
 let
   inherit (pkgs) lib omanixFork;
   f = omanixFork.forkDir;
   mkApp = drv: { type = "app"; program = lib.getExe drv; };
+  tools = import ../lib/tools.nix { inherit pkgs omanix; };
 in
 {
+  configure = mkApp tools.omanix-configure;
+  flash-usb = mkApp tools.loom-flash;
+  verify-release = { type = "app"; program = "${pkgs.writeShellScript "verify-release" ''
+    exec ${lib.getExe tools.omanix-release} verify "$@"
+  ''}"; };
+
   # nix run .#porting-report -- --to <tag|rev> [--json] [--out DIR]
   porting-report = mkApp (pkgs.writeShellApplication {
     name = "porting-report";

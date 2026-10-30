@@ -68,7 +68,11 @@ let
       else v);
     in if r.success then r.value else "<error>";
   configJson = {
-    loom = san 8 (removeAttrs config.loom [ "keys" ]) // { keys = san 3 (removeAttrs config.loom.keys [ "generated" ]); };
+    loom = san 8 (removeAttrs config.loom [ "keys" "host" "secrets" ]) // {
+      secrets = san 3 (removeAttrs config.loom.secrets [ "directory" ]) // { directory = "<host repo>/secrets"; };
+      keys = san 3 (removeAttrs config.loom.keys [ "generated" ]);
+      host = san 3 (removeAttrs config.loom.host [ "src" ]);   # the source's store path changes every commit
+    };
     omanix = san 8 (removeAttrs cfg [ "home" "catalog" "cli" ]) // {
       # what the fork's readers expect (P6, W3/W17): the resident's name
       defaults = san 2 cfg.defaults // { agent = if config.loom.agent.enable or false then config.loom.agent.name else null; };
@@ -125,13 +129,11 @@ let
     cfg.home.files);
 
   # ---- host.json ---------------------------------------------------------------
-  lock = let p = hostSrc + "/flake.lock"; in
-    if hostSrc != "" && builtins.pathExists p then builtins.fromJSON (builtins.readFile p) else null;
-  lockRoot = if lock == null then { } else lock.nodes.${lock.root}.inputs or { };
-  plugins = lib.mapAttrsToList (n: node:
-    let l = if builtins.isString node then lock.nodes.${node} else { }; in
-    { input = n; original = l.original or { }; rev = l.locked.rev or null; url = l.original.url or null; })
-    (lib.filterAttrs (n: _: !(builtins.elem n [ "omanix" "nixpkgs" "home-manager" ])) lockRoot);
+  # Plugins and their locked revisions come from the flake's inputs (what
+  # flake.lock resolved), not from the source path, so the catalog changes
+  # only when they do.
+  pluginInputs = lib.filterAttrs (n: i: !(builtins.elem n [ "self" "omanix" "nixpkgs" "home-manager" ]) && i ? outPath) hostInputs;
+  plugins = lib.mapAttrsToList (n: i: { input = n; rev = i.rev or null; narHash = i.narHash or null; url = null; }) pluginInputs;
   hostFiles = dir: rel:
     if hostSrc == "" || !builtins.pathExists dir then [ ]
     else lib.concatLists (lib.mapAttrsToList (n: t:
@@ -143,7 +145,7 @@ let
     name = config.networking.hostName;
     id = config.loom.host.id or null;
     inherit plugins;
-    lockRevs = lib.mapAttrs (n: node: if builtins.isString node then lock.nodes.${node}.locked.rev or null else "follows") lockRoot;
+    lockRevs = lib.mapAttrs (_: i: i.rev or i.narHash or null) (lib.filterAttrs (n: i: n != "self" && i ? outPath) hostInputs);
     moduleFiles = hostFiles hostSrc "";
     overriddenHomeFiles = overridden;
     persistAdditions = lib.concatMap (d: map pathOf (lib.toList d.value))
@@ -275,10 +277,17 @@ in
   };
 
   config = lib.mkIf (cfg.enable && cfg.catalog.enable) {
-    # sw/share/omanix/catalog (next to home/default.nix's packages.txt)
+    # The catalog belongs to the generation: $out/catalog in the toplevel.
+    # sw/share/omanix/catalog (next to home/default.nix's packages.txt) is a
+    # fixed link to the running one, so a new catalog (every commit changes
+    # config.json) rebuilds only the toplevel, not system-path and what
+    # hangs off it (dbus, units, user environments).
+    system.systemBuilderCommands = ''
+      ln -s ${cfg.catalog.package}/share/omanix/catalog $out/catalog
+    '';
     environment.extraSetup = ''
       mkdir -p $out/share/omanix
-      ln -s ${cfg.catalog.package}/share/omanix/catalog $out/share/omanix/catalog
+      ln -s /run/current-system/catalog $out/share/omanix/catalog
     '';
   };
 }

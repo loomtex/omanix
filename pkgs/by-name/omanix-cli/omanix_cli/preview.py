@@ -95,7 +95,7 @@ def validate(allow: dict, path: str, value) -> dict:
         if not key or not all(LUA_KEY.match(k) for k in key):
             raise Refused(f"{path}: bad allowlist entry")
         lit = _lua_scalar(spec, value)
-        lua = "hl.config({ " + "".join(f"{k} = {{ " for k in key[:-1]) + f"{key[-1]} = {lit}" + " }" * len(key) + " })"
+        lua = "hl.config({ " + "".join(f"{k} = {{ " for k in key[:-1]) + f"{key[-1]} = {lit}" + " }" * (len(key) - 1) + " })"
         return {"label": f"{'.'.join(key)} → {lit}", "kind": kind, "lua": lua}
     if kind == "theme":
         if not isinstance(value, str) or not THEME.match(value):

@@ -28,7 +28,7 @@ let
   golden = ../tests/golden/host-omanix;
   goldenHost = self.lib.mkHost {
     self = golden;
-    modules = [ (golden + "/configuration.nix") ../tests/fixtures/cli-host/vm.nix ];
+    modules = [ (golden + "/configuration.nix") { users.allowNoPasswordLogin = true; } ];
   };
   answers = builtins.fromJSON (builtins.readFile ../tests/fixtures/hostgen/answers-omanix.json);
   gcfg = goldenHost.config;
@@ -133,7 +133,10 @@ in
         install --answers ${../tests/fixtures/hostgen/answers-omanix.json} --template ${../templates/host} \
         --catalog ${refCatalog}/hostgen.json --out rendered
       diff -r rendered ${golden}
-      test -e $toplevel/sw/share/omanix/catalog/index.json
+      # the VM tests' host repo is the template plus a test stub
+      diff -r -x vm.nix -x default.nix ${../templates/host} ${../tests/fixtures/cli-host-src}
+      test -e $toplevel/catalog/index.json
+      test "$(readlink $toplevel/sw/share/omanix/catalog)" = /run/current-system/catalog
       touch $out
     '';
 

@@ -17,7 +17,7 @@
 #                   until `omanix persist add` (U32), and the card flags
 #                   "flake.lock: adds input fixture".
 #
-# The host repo is templates/host (+ tests/fixtures/cli-host), locked to
+# The host repo is tests/fixtures/cli-host-src (templates/host + a test stub), locked to
 # this omanix source; the VM holds every flake source and the build inputs
 # of the derivations a commit changes (tests/lib/host-repo.nix).
 { pkgs, loom, omanix, variant }:
@@ -31,10 +31,14 @@ let
 
   pluginFlake = (import ./fixtures/plugin/flake.nix).outputs { self = { }; nixpkgs = omanix.inputs.nixpkgs; };
 
+  # What the VM's `nix eval` of a commit gives, prebuilt here: the same
+  # files (tests/fixtures/cli-host-src) and the same inputs.
+  hostSrc = ./fixtures/cli-host-src;
   mkRef = extra: homeExtra: omanix.lib.mkHost {
-    self = template;
-    modules = [ (template + "/configuration.nix") ./fixtures/cli-host/vm.nix ] ++ extra;
-    homeModules = [ (template + "/home.nix") ] ++ homeExtra;
+    self = hostSrc;
+    inputs = { inherit omanix; inherit (omanix.inputs) nixpkgs home-manager; };
+    modules = [ (hostSrc + "/configuration.nix") ] ++ extra;
+    homeModules = [ (hostSrc + "/home.nix") ] ++ homeExtra;
   };
   before = mkRef [ ] [ ];
   afterSet = mkRef [ { omanix.hyprland.gdkScale = 1; } ] [ ];
@@ -57,10 +61,8 @@ let
 
   # The host repo's first commit: the template, the test stub module, the lock.
   hostTree = pkgs.runCommand "omanix-cli-host" { } ''
-    cp -r ${template} $out
+    cp -r ${hostSrc} $out
     chmod -R u+w $out
-    cp ${./fixtures/cli-host/vm.nix} $out/modules/vm.nix
-    cp ${./fixtures/cli-host/default.nix} $out/modules/default.nix
     cp ${hostLock} $out/flake.lock
   '';
   pluginTree = pkgs.runCommand "omanix-plugin-fixture" { } ''
@@ -71,7 +73,7 @@ let
 
   contract = "${pkgs.python3}/bin/python3 -I ${../pkgs/by-name/omanix-cli/omanix_cli/contract.py}";
 in
-pkgs.testers.runNixOSTest {
+(pkgs.testers.runNixOSTest {
   name = "omanix-${variant}";
   node.pkgsReadOnly = false;
   node.specialArgs = { inputs = { }; inherit loom omanix; };
@@ -82,7 +84,7 @@ pkgs.testers.runNixOSTest {
       (loom.lib.mkHostModule { self = template; homeModules = [ (template + "/home.nix") ]; hostInputs = { }; system = "x86_64-linux"; })
       omanix.nixosModules.default
       (template + "/configuration.nix")
-      ./fixtures/cli-host/vm.nix
+      { users.allowNoPasswordLogin = true; }
       (loom.outPath + "/tests/vm/disk-standin.nix")
       (loom.outPath + "/tests/lib/approval-stub.nix")
     ];
@@ -206,7 +208,7 @@ pkgs.testers.runNixOSTest {
             ck = j(ada("omanix check --json", timeout=3600))
             assert ck["eval"]["ok"] and ck["keysSync"]["ok"] and ck["build"]["ok"], ck
             out = ck["build"]["out"]
-            assert '"gdkScale": 1' in sh(f"cat {out}/sw/share/omanix/catalog/config.json")
+            assert '"gdkScale": 1' in sh(f"cat {out}/catalog/config.json")
 
         with subtest("propose: the card shows the request, the diff and nvd; the denial reaches the resident"):
             sh("echo 'deny:not today' > /run/loom-test/answer")
@@ -376,4 +378,4 @@ pkgs.testers.runNixOSTest {
       '';
     }.${variant}}
   '';
-}
+}) // { inherit hostTree before afterSet afterPlugin; }   # for debugging the offline build set

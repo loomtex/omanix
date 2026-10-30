@@ -10,6 +10,12 @@ let
   home = config.users.users.${user}.home;
   homeLib = import ../../../lib/home { inherit lib; };
   up = "${cfg.fork.package}/config";
+  # Read at evaluation time from the pinned source, never from a build output
+  # (no IFD: `loom propose` and `omanix check` evaluate with it off). The fork
+  # leaves these files unchanged.
+  upSrc = "${cfg.fork.src}/config";
+  # fork/rewrite.toml's one rewrite of these files, applied here (same bytes; home-files-golden)
+  fromSrc = f: builtins.replaceStrings [ "/usr/share/omarchy" ] [ "/run/current-system/omarchy" ] (builtins.readFile "${cfg.fork.src}/${f}");
 
   # Upstream files HM links as they are (override with lib.mkForce on .source).
   plain = [
@@ -24,9 +30,9 @@ let
     "autostart/org.fcitx.Fcitx5.desktop"
     "autostart/print-applet.desktop"
   ] ++ map (f: "wireplumber/wireplumber.conf.d/${f}")
-    (builtins.attrNames (builtins.readDir "${up}/wireplumber/wireplumber.conf.d"));
+    (builtins.attrNames (builtins.readDir "${upSrc}/wireplumber/wireplumber.conf.d"));
 
-  gitConfig = builtins.readFile "${up}/git/config" + ''
+  gitConfig = builtins.readFile "${upSrc}/git/config" + ''
 
     # omanix: from loom.user (home/desktop.nix). Your own settings go in ~/.gitconfig.
     [user]
@@ -45,7 +51,7 @@ in
         "btop/themes/current.theme".source =
           config.lib.file.mkOutOfStoreSymlink "${home}/.local/state/omarchy/current/theme/btop.theme";
       };
-      home.file.".bashrc".text = homeLib.withOverlay (builtins.readFile "${cfg.fork.package}/default/bashrc")
+      home.file.".bashrc".text = homeLib.withOverlay (fromSrc "default/bashrc")
         (homeLib.include.bash home "bashrc");
     };
 

@@ -11,7 +11,19 @@
     loom = {
       url = "git+file:///agents/ada/projects/loom?ref=v2-skeleton";
       inputs.nixpkgs.follows = "nixpkgs";
+      # U29: one nixpkgs (and one home-manager) node in a host's lock. loom's
+      # 26.05 pair only serves loom's own CI (D1); here it follows unstable
+      # rather than shipping a second nixpkgs in every install.
+      inputs.nixpkgs-2605.follows = "nixpkgs";
+      inputs.home-manager-2605.follows = "loom/home-manager";
+      inputs.impermanence.inputs.nixpkgs.follows = "nixpkgs";
+      inputs.impermanence.inputs.home-manager.follows = "loom/home-manager";
+      inputs.nuketown.inputs.nixpkgs-unstable.follows = "nixpkgs";
     };
+
+    # §b.1/§d.2: a host flake says `home-manager.follows = "omanix/home-manager"`,
+    # so there is one home-manager (and one nixpkgs) for omanix, loom and plugins.
+    home-manager.follows = "loom/home-manager";
 
     # Hardware quirks that build on nixos-hardware (surface, apple-t2, §f.2.6):
     # a host imports omanix.inputs.nixos-hardware.nixosModules.<x> next to the
@@ -54,6 +66,12 @@
 
       # The omanix base; omanix.lib.mkHost adds it after loom's bundle.
       nixosModules.default = import ./modules/omanix { omanix = self; };
+
+      # `nix flake init -t omanix#host` (§d; the installer renders the same files).
+      templates.host = {
+        path = ./templates/host;
+        description = "An omanix host: plain NixOS + home-manager modules on omanix.lib.mkHost";
+      };
 
       # Reference hosts: fixtures for checks and cache seeds (§b.2).
       nixosConfigurations = import ./hosts { inherit inputs; omanix = self; };

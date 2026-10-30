@@ -15,30 +15,26 @@ let
 
   passwd = pkgs.writeShellApplication {
     name = "omanix-passwd";
-    runtimeInputs = with pkgs; [ coreutils git jq mkpasswd sops ];
+    runtimeInputs = with pkgs; [ coreutils git jq mkpasswd sops cfg.cli.package ];
     text = ''
       # omanix-passwd: the Change password dialog's helper (human only). The
       # password arrives on stdin and goes to mkpasswd and sops on stdin.
       if [[ -r /etc/loom/cli.json ]] && jq -e --argjson u "$(id -u)" '(.agentUids // []) | index($u)' /etc/loom/cli.json >/dev/null; then
         echo "omanix-passwd: the human's own tool; agents can't run it" >&2; exit 2
       fi
-      repo=''${OMANIX_HOST_REPO:-$HOME/omanix-host}
-      [[ -d $repo/.git ]] || { echo "No working copy of the host repo at $repo: open it first (omanix repo open)." >&2; exit 1; }
+      # The human's working copy (~/omanix-host), cloned from the mirror on
+      # demand; the hash goes through `omanix secret set` (encrypt-only).
+      repo=''${OMANIX_HOST_REPO:-$(omanix repo path --ensure)}
+      [[ -d $repo/.git ]] || { echo "No working copy of the host repo at $repo (omanix repo open)." >&2; exit 1; }
       IFS= read -r pw || { echo "no password on stdin" >&2; exit 2; }
       (( ''${#pw} >= 8 )) || { echo "Use at least 8 characters." >&2; exit 2; }
       hash=$(printf '%s\n' "$pw" | mkpasswd --method=yescrypt --stdin)
       unset pw
       cd "$repo"
-      f=secrets/user.yaml
-      if [[ -f $f ]]; then
-        jq -Rn --arg h "$hash" '$h' | sops set --value-stdin "$f" '["password_hash"]'
-      else
-        mkdir -p secrets
-        jq -n --arg h "$hash" '{password_hash: $h}' | sops encrypt --input-type json --output-type yaml --filename-override "$f" --output "$f" /dev/stdin
-      fi
-      git add "$f"
+      printf '%s' "$hash" | omanix secret set user password_hash --repo "$repo" >/dev/null
+      git add secrets/user.yaml
       git commit -q -m "user: change the login password"
-      exec loom propose --request "Change my login password"
+      exec omanix propose --repo "$repo" --request "Change my login password"
     '';
   };
 in

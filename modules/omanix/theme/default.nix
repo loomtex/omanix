@@ -148,17 +148,7 @@ in
     systemd.user.services.omanix-session-init.serviceConfig.ExecStartPost =
       lib.mkIf cfg.theme.lock "${relock}";
 
-    # catalog/themes.json (§h.9)
-    environment.extraSetup = ''
-      mkdir -p $out/share/omanix/catalog
-      cat > $out/share/omanix/catalog/themes.json <<'EOF'
-      ${builtins.toJSON {
-        inherit (cfg.theme) default lock;
-        available = names;
-        extra = lib.mapAttrs (_: e: { inherit (e) trusted; }) cfg.theme.extra;
-        boot = cfg.theme.boot.theme;
-      }}
-      EOF
-    '';
+    # catalog/themes.json (§h.9) is catalog.nix's: default, lock, boot theme
+    # and the registry with each extra theme's trust.
   };
 }

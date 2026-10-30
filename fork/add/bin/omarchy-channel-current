@@ -9,4 +9,4 @@ if (($# > 0)); then
   exit 2
 fi
 
-jq -r '.omanix.release.channel // empty' /run/current-system/sw/share/omanix/catalog/config.json 2>/dev/null
+jq -r '.releaseChannel // empty' /run/current-system/sw/share/omanix/catalog/config.json 2>/dev/null

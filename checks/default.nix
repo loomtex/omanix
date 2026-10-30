@@ -44,5 +44,6 @@ in
 // import ./hardware.nix { inherit pkgs self inputs; }
 // import ./theme.nix { inherit pkgs self inputs; }
 // import ./cli.nix { inherit pkgs self inputs; }
+// import ./demo.nix { inherit pkgs self inputs; }
 // lib.mapAttrs' (n: v: lib.nameValuePair "pkg-${n}" v)
   (lib.filterAttrs (n: _: n != "default") self.packages.${pkgs.system})

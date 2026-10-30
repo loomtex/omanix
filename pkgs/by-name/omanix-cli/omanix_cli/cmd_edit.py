@@ -516,7 +516,15 @@ def _inspect(ctx, ref: str) -> dict:
     show = _flake_json(["flake", "show", "--json", "--no-write-lock-file", "--all-systems", ref], timeout=600)
     locks = meta.get("locks") or {}
     root = (locks.get("nodes") or {}).get(locks.get("root", "root"), {})
-    outputs = {k: sorted(v.keys()) if isinstance(v, dict) else [] for k, v in show.items()}
+    outputs = {k: sorted(v.keys()) if isinstance(v, dict) and "type" not in v else [] for k, v in show.items()}
+    # `nix flake show` lists homeModules (and other non-standard outputs) as
+    # unknown; their names are a cheap eval of the output's attribute names.
+    for k in ("nixosModules", "homeModules", "homeManagerModules", "overlays"):
+        if k in show and not outputs.get(k):
+            r = run(["nix", "eval", "--json", "--no-write-lock-file", f"{ref}#{k}", "--apply", "builtins.attrNames"],
+                    env=nix_env(), timeout=300)
+            if r.returncode == 0:
+                outputs[k] = sorted(json.loads(r.stdout))
     tags = _tags(ref)
     try:
         repo = ctx.repo()

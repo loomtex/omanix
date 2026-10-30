@@ -6,8 +6,8 @@
         names the version the files carry. `nix run .#verify-release` and
         scripts/verify-release.sh run this.
   omanix-release tree-sums ROOT
-        writes ROOT/scripts/SHA256SUMS over scripts/, pkgs/ and fork/ (what
-        the scripts' preamble checks in a checkout without a signed tag)
+        writes ROOT/scripts/SHA256SUMS over the whole tree (what the
+        scripts' preamble checks in a copy without git)
   omanix-release sign FILE --key K
         ssh-keygen -Y sign -n omanix-release: FILE.sig. K is an SSH key the
         agent or a token holds (Josh's YubiKey, D11), or a test key file.
@@ -144,17 +144,20 @@ def sign(path, key):
 
 
 def tree_sums(root):
-    """scripts/SHA256SUMS over scripts/, pkgs/, fork/ (sorted, relative to
-    root, the two sums files excluded): §e.10 step 2's fallback."""
+    """scripts/SHA256SUMS over every file of the tree (sorted, relative to
+    root; .git, __pycache__ and the two sums files excluded): §e.10 step 2's
+    fallback for a checkout without git. The whole tree, not only scripts/,
+    pkgs/ and fork/: lib/ and flake.nix decide what `nix run` runs."""
     lines = []
-    for top in ("scripts", "pkgs", "fork"):
-        for dp, dns, fns in os.walk(os.path.join(root, top)):
-            dns[:] = sorted(x for x in dns if x != "__pycache__")
-            for fn in sorted(fns):
-                rel = os.path.relpath(os.path.join(dp, fn), root)
-                if rel in ("scripts/SHA256SUMS", "scripts/SHA256SUMS.sig") or os.path.islink(os.path.join(dp, fn)):
-                    continue
-                lines.append(f"{sha256(os.path.join(root, rel))}  {rel}\n")
+    for dp, dns, fns in os.walk(root):
+        dns[:] = sorted(x for x in dns if x not in ("__pycache__", ".git") and not (dp == root and x == "result"))
+        for fn in sorted(fns):
+            full = os.path.join(dp, fn)
+            rel = os.path.relpath(full, root)
+            if rel in ("scripts/SHA256SUMS", "scripts/SHA256SUMS.sig") or os.path.islink(full):
+                continue
+            lines.append(f"{sha256(full)}  {rel}\n")
+    os.makedirs(os.path.join(root, "scripts"), exist_ok=True)
     with open(os.path.join(root, "scripts", SUMS), "w") as f:
         f.writelines(sorted(lines, key=lambda x: x.split("  ", 1)[1]))
     return len(lines)

@@ -86,12 +86,12 @@ def test_wrong_namespace(tmp_path, keys):
 
 
 def test_tree_sums(tmp_path):
-    for p in ("scripts/a.sh", "pkgs/x/y.nix", "fork/z.toml", "other/ignored"):
+    for p in ("scripts/a.sh", "pkgs/x/y.nix", "flake.nix", ".git/HEAD", "pkgs/__pycache__/c.pyc", "scripts/SHA256SUMS.sig"):
         (tmp_path / p).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / p).write_text(p)
     assert r.tree_sums(str(tmp_path)) == 3
     names = [line.split("  ", 1)[1].strip() for line in open(tmp_path / "scripts/SHA256SUMS")]
-    assert names == ["fork/z.toml", "pkgs/x/y.nix", "scripts/a.sh"]
+    assert names == ["flake.nix", "pkgs/x/y.nix", "scripts/a.sh"]
 
 
 def git(repo, *args, **kw):

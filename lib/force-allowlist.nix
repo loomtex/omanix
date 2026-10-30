@@ -157,7 +157,11 @@
   }
   {
     option = "loom.switch.afterTest";
-    reason = "a list that only appends: the Hyprland reload and the post-promotion settle (§f.4.6)";
+    reason = "a list that only appends: the Hyprland reload the watchdog's configerrors check needs (§f.2.9)";
+  }
+  {
+    option = "loom.switch.afterPromote";
+    reason = "a list that only appends: the post-promotion settle and reload (§f.4.6)";
   }
   {
     option = "i18n.inputMethod.fcitx5.addons";

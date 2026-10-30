@@ -5,8 +5,10 @@
 # run in file-name order) with an optional <NN-name>.nix (a NixOS module the
 # node imports, for what the case needs installed). Around them, this file
 # records every HM target's link before and asserts after that none changed
-# and that configerrors stays empty. W16: glass, chromium flags; W17 adds
-# font set, text size, monitor scale, bar position, keyboard layout, … .
+# and that configerrors stays empty. W16: glass, chromium flags; W17: apps,
+# defaults (U35), font set, text size and the kv settle, keyboard layout
+# (U28). The .nix modules are merged into the one node, so a case's
+# declarations must not contradict another case's.
 { pkgs, loom, omanix }:
 
 let
@@ -31,7 +33,11 @@ pkgs.testers.runNixOSTest {
     OVERLAY = f"{HOME}/.local/state/omanix/overlay"
     STATE = f"{HOME}/.local/state/omarchy/current"
 
+    def s(cmd):
+        return machine.succeed(as_user(cmd))
+
     wait_desktop()
+    machine.sleep(5)
     links = assert_hm_links(hm_links())
 
     ${lib.concatMapStrings (f: ''
@@ -39,8 +45,11 @@ pkgs.testers.runNixOSTest {
       ${builtins.readFile (dir + "/${f}")}
     '') cases}
 
-    with subtest("every HM target is still the same link; the Lua config loads"):
+    with subtest("every HM target is still the same read-only link; the Lua config loads"):
         assert_hm_unchanged(links)
+        for t in links:
+            if t != ".config/btop/themes/current.theme":   # an out-of-store link into theme state, by design
+                machine.fail(as_user(f"echo >> {HOME}/{t}"))
         configerrors_empty()
   '';
 }

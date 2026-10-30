@@ -144,6 +144,7 @@ in
   theme-switch = vm ../tests/theme-switch.nix;
 
   # KEEP-AS-GUI writers against the read-only HM files (cases in
-  # tests/writers-respect-hm/*.py; W16: glass, chromium flags).
+  # tests/writers-respect-hm/*.py; W16: glass, chromium flags; W17: apps,
+  # defaults, fonts, input).
   writers-respect-hm = vm ../tests/writers-respect-hm.nix;
 }

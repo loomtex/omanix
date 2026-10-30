@@ -9,9 +9,13 @@ with subtest("chromium: a runtime feature goes to overlay/chromium-flags.conf an
     machine.fail(f"grep -q OmanixProbe {hm}")
     flags = machine.succeed(as_user("omanix-chromium-flags")).splitlines()
     print(flags)
-    want = "--enable-features=TouchpadOverscrollHistoryNavigation,OverlayScrollbar,OmanixProbe,Second"
-    assert want in flags, flags
-    assert sum(f.startswith("--enable-features=") for f in flags) == 1, flags
+    feats = [f for f in flags if f.startswith("--enable-features=")]
+    assert len(feats) == 1, flags
+    want = feats[0]
+    got = want.split("=", 1)[1].split(",")
+    # upstream's, then the declared ones (omanix.apps.chromium.features, W17), then the overlay's
+    assert got[:2] == ["TouchpadOverscrollHistoryNavigation", "OverlayScrollbar"] and got[-2:] == ["OmanixProbe", "Second"], got
+    assert "WebUIDarkMode" in got, got
     assert "--ozone-platform=wayland" in flags, flags
     # the real browser, through the wrapper on PATH
     machine.succeed(as_user("setsid -f chromium --headless=new --user-data-dir=/tmp/omanix-cr about:blank >/tmp/omanix-cr.log 2>&1 </dev/null"))

@@ -67,6 +67,12 @@
       # The omanix base; omanix.lib.mkHost adds it after loom's bundle.
       nixosModules.default = import ./modules/omanix { omanix = self; };
 
+      # `nix flake init -t omanix#host` (§d; the installer renders the same files).
+      templates.host = {
+        path = ./templates/host;
+        description = "An omanix host: plain NixOS + home-manager modules on omanix.lib.mkHost";
+      };
+
       # Reference hosts: fixtures for checks and cache seeds (§b.2).
       nixosConfigurations = import ./hosts { inherit inputs; omanix = self; };
 

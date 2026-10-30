@@ -372,8 +372,10 @@ def secret_set(ctx, a):
         raise CliError(EXIT.USAGE, "secret values never pass through an agent: ask the human to run "
                        f"`omanix secret set {a.file} {a.name}` in their terminal (it reads the value without echoing it)")
     f = a.file[:-5] if a.file.endswith(".yaml") else a.file
-    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", f) or not re.fullmatch(r"[A-Za-z0-9_.-]+", a.name):
-        raise CliError(EXIT.USAGE, "file and name: letters, digits, '-', '_' and '.' only")
+    if f not in ("host", "user", "data", "agents"):
+        raise CliError(EXIT.USAGE, "file: host, user, data or agents (the files .sops.yaml has rules for)")
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", a.name):
+        raise CliError(EXIT.USAGE, "name: letters, digits, '-', '_' and '.' only")
     if sys.stdin.isatty():
         if ctx.json:
             raise CliError(EXIT.USAGE, "--json: pipe the value on stdin")

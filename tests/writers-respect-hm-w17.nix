@@ -150,8 +150,10 @@ pkgs.testers.runNixOSTest {
         assert s("fc-match monospace -f '%{family[0]}'").strip() == "DejaVu Sans Mono"
         assert s("omarchy-font-current").strip() == "DejaVu Sans Mono"
         machine.succeed("grep -qx 'DejaVu Sans Mono' ${home}/.cache/omanix-hook-font-set")
-        doctor = s("omanix-overlay doctor")
-        assert "overlay not empty: kitty.conf" in doctor and "overlay not empty: fontconfig/fonts.conf" in doctor, doctor
+        doctor = json.loads(s("omanix doctor --json"))
+        listed = {o["overlay"]: o for o in doctor["overlays"]}
+        assert "kitty.conf" in listed and "fontconfig/fonts.conf" in listed, doctor
+        assert "omanix.fonts.monospace" in listed["kitty.conf"]["shadows"], doctor
         state = json.loads(machine.succeed("cat /run/omanix/session/${uid}/runtime.json"))
         assert state["monospace"] == "DejaVu Sans Mono", state
 

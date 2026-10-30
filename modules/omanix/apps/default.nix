@@ -87,7 +87,7 @@ let
     (homeLib.include.lua "autostart");
 
   # ~/.config/chromium-flags.conf: upstream's, with the declared features.
-  flagsUp = lib.splitString "\n" (lib.removeSuffix "\n" (builtins.readFile "${up}/config/chromium-flags.conf"));
+  flagsUp = lib.splitString "\n" (lib.removeSuffix "\n" (builtins.replaceStrings [ "/usr/share/omarchy" ] [ "/run/current-system/omarchy" ] (builtins.readFile "${cfg.fork.src}/config/chromium-flags.conf")));
   withFeatures = l:
     if lib.hasPrefix "--enable-features=" l && acfg.chromium.features != [ ]
     then l + "," + lib.concatStringsSep "," acfg.chromium.features else l;

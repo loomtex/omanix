@@ -9,10 +9,11 @@ let
   home = config.users.users.${user}.home;
   homeLib = import ../../../lib/home { inherit lib; };
   up = "${cfg.fork.package}/config";
+  upSrc = "${cfg.fork.src}/config";   # eval-time reads: the pinned source (no IFD; the fork leaves these unchanged)
   toml = pkgs.formats.toml { };
   ov = homeLib.overlayDir home;
 
-  alacrittyUp = builtins.fromTOML (builtins.readFile "${up}/alacritty/alacritty.toml");
+  alacrittyUp = builtins.fromTOML (builtins.readFile "${upSrc}/alacritty/alacritty.toml");
   alacrittyTheme = lib.head alacrittyUp.general.import;
 
   # omanix.fonts (fonts.nix) in each terminal's own syntax; upstream's lines
@@ -25,20 +26,20 @@ let
   };
   replaceLine = prefix: line: text: lib.concatStringsSep "\n"
     (map (l: if lib.hasPrefix prefix l then line else l) (lib.splitString "\n" text));
-  kittyConf = builtins.readFile "${up}/kitty/kitty.conf" + ''
+  kittyConf = builtins.readFile "${upSrc}/kitty/kitty.conf" + ''
 
     # omanix.fonts (fonts.nix)
     font_family ${font}
     font_size ${size}.0
   '';
   ghosttyConf = replaceLine "font-size =" "font-size = ${size}"
-    (replaceLine "font-family =" "font-family = \"${font}\"" (builtins.readFile "${up}/ghostty/config"));
+    (replaceLine "font-family =" "font-family = \"${font}\"" (builtins.readFile "${upSrc}/ghostty/config"));
 
   # foot: `include=` must be the last key of [main] (a later section in the
   # main file still wins for that section).
   footIni =
     let
-      lines = lib.splitString "\n" (replaceLine "font=" "font=${font}:size=${size}" (builtins.readFile "${up}/foot/foot.ini"));
+      lines = lib.splitString "\n" (replaceLine "font=" "font=${font}:size=${size}" (builtins.readFile "${upSrc}/foot/foot.ini"));
       idx = lib.findFirst (i: i > 0 && lib.hasPrefix "[" (builtins.elemAt lines i)) (builtins.length lines)
         (lib.range 0 (builtins.length lines - 1));
       before = lib.take idx lines;

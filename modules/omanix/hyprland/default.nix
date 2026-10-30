@@ -117,7 +117,7 @@ in
       "hypr/hyprland.lua".text = hyprlandLua;
       "hypr/looknfeel.lua".text = luaFile "looknfeel" looknfeel;
       # input.lua is input.nix's, autostart.lua apps/default.nix's.
-      "hypr/hyprsunset.conf".text = homeLib.withOverlay (builtins.readFile "${up}/hyprsunset.conf")
+      "hypr/hyprsunset.conf".text = homeLib.withOverlay (builtins.readFile "${cfg.fork.src}/config/hypr/hyprsunset.conf")
         (homeLib.include.hyprlang config.users.users.${user}.home "hypr/hyprsunset.conf");
       "hypr/xdph.conf".source = "${up}/xdph.conf";
     };

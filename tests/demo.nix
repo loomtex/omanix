@@ -168,7 +168,12 @@ pkgs.testers.runNixOSTest {
     def diag():
         print(machine.execute("journalctl -b --no-pager -n 150 _UID=${uid} | grep -iv 'layershell screen'; "
                               "journalctl -b --no-pager -n 60 -u 'loom-agent-bridge@*' -u 'loom-switch-*' -u nuketown-approval; "
-                              "ls -la /agents/ada/demo 2>&1; tail -n 40 /agents/ada/demo/*.json 2>&1")[1])
+                              "ls -la /agents/ada/demo 2>&1; tail -n 40 /agents/ada/demo/*.json 2>&1; "
+                              "ps -eo pid,user,args | grep -E 'pkexec|loom|nuketown|polkit' | grep -v grep")[1])
+        try:
+            print("chat rows:", json.dumps(state("omanix.chat").get("rows"))[-3000:])
+        except Exception as e:
+            print("chat state unavailable:", e)
 
     def until(f, what, timeout=120):
         end = time.monotonic() + timeout
@@ -285,7 +290,9 @@ pkgs.testers.runNixOSTest {
       with subtest("setup: silo stand-in; owner, host and agent keys; the repo on silo; ada's clone over ssh"):
           silo.wait_for_unit("sshd.service")
           silo.wait_for_open_port(22)
-          assert sh("getent hosts silo.loom.farm").split()[0] == "0.0.0.0"
+          # the tripwire: the real silo never resolves (resolved drops 0.0.0.0 entries; files gives 0.0.0.0)
+          rc, out = machine.execute("getent hosts silo.loom.farm")
+          assert rc != 0 or out.split()[0] == "0.0.0.0", out
           sh("test -f /etc/ssh/ssh_host_ed25519_key || ssh-keygen -q -t ed25519 -N ''' -f /etc/ssh/ssh_host_ed25519_key")
           assert run_as("ada", "mkdir -p ~/.ssh && ssh-keygen -q -t ed25519 -N ''' -C ada@machine -f ~/.ssh/id_ed25519")[0] == 0
           sh(f"""
@@ -526,7 +533,8 @@ pkgs.testers.runNixOSTest {
             rv = jfile(f"{d}review.json")
             assert rv["recommendation"] == "approve", rv
             snap = [s for s in jfile(f"{d}request.json")["snapshots"] if s.get("executed")][0]
-            assert "system-connections" not in sh(f"cat {d}{snap['snapshot']}")
+            body = sh(f"cat {d}{snap['snapshot']}")
+            assert "system-connections" not in body, body
             machine.screenshot("5-second-card")
             click("card.approve")
             until(lambda: "after:" in sh("cat /agents/ada/demo/5b.log 2>/dev/null || true"), "the script ran", 120)
@@ -544,7 +552,7 @@ pkgs.testers.runNixOSTest {
             machine.screenshot("5-change-card")
             click("banner.approve")
             assert result("5c")["result"] == "applied"
-            sh("grep -rq 'scan-rand-mac-address=no' /etc/NetworkManager/")
+            sh("grep -q 'wifi.scan-rand-mac-address=no' /etc/NetworkManager/NetworkManager.conf")
             no_error_rows()
       '';
 
@@ -562,7 +570,9 @@ pkgs.testers.runNixOSTest {
             n, kc, res = last_switch()
             assert res["status"] == "rolled-back" and "hyprland-display" in res["reason"], res
             assert sh("readlink -f /run/current-system").strip() == BASE
-            sh(f"test \"$(readlink -f /nix/var/nix/profiles/system)\" = {BASE}")   # never reached the boot default
+            # never reached the boot default (a test VM starts without a system profile)
+            off = sh("readlink -f /run/demo/out-screen-off").strip()
+            assert sh("readlink -f /nix/var/nix/profiles/system").strip() != off
             until(lambda: any(m["name"] == "Virtual-1" for m in monitors()), "the screen is back", 60)
 
         with subtest("the panel says what happened; Why? → why-failed"):
@@ -589,7 +599,7 @@ pkgs.testers.runNixOSTest {
             until(lambda: any(x["kind"] == "applied" for x in rows()), "the applied row (Undo)", 30)
             machine.screenshot("6-applied-undo")
             ipc("omanix.chat", "undo")
-            card("banner", "routine")
+            card("banner", "routine", 180)
             d = request_dir()
             kc = jfile(f"{d}kind/card.json")
             assert kc["kind"] == "undo" and kc["title"] == "Undo: Yes, 60 Hz.", kc

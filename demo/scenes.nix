@@ -36,6 +36,7 @@ let
   battery = {
     services.power-profiles-daemon.enable = false;
     services.tlp.enable = true;
+    loom.persist.system.directories = [ "/var/lib/tlp" ];
     omanix.hyprland.monitors = [ { output = ""; mode = "1280x800@60"; } ];
   };
 in
@@ -105,6 +106,7 @@ in
         "  services.power-profiles-daemon.enable = false; # TLP replaces it"
         "  services.tlp.enable = true;"
         "  omanix.hyprland.monitors = [ { output = \"\"; mode = \"1280x800@60\"; } ];"
+        "  loom.persist.system.directories = [ \"/var/lib/tlp\" ]; # TLP's state survives reboots"
         "  hardware.bluetooth.powerOnBoot = false;"
         "}" ]))
       (run "edit" "Importing it in modules/default.nix" (edit [ "replace" "modules/default.nix" "./vm.nix ]" "./vm.nix ./power.nix ]" ]))
@@ -143,7 +145,7 @@ in
     resident = [
       wait
       (say "I'll write a short script that turns Wi-Fi power saving off for this boot and restarts the Wi-Fi stack, and ask you to run it as root.")
-      (run "edit" "Writing ~/scratch/fix-wifi.sh" "mkdir -p ~/scratch ~/demo && cp /etc/demo/fix-wifi.sh ~/scratch/fix-wifi.sh")
+      (run "edit" "Writing ~/scratch/fix-wifi.sh" "mkdir -p ~/scratch ~/demo && install -m 644 /etc/demo/fix-wifi.sh ~/scratch/fix-wifi.sh")
       (run "run" "sudo bash fix-wifi.sh" "cd ~/scratch && sudo --why 'Wi-Fi keeps dropping: turn power saving off for this boot and restart the Wi-Fi stack' bash fix-wifi.sh > ~/demo/5a.log 2>&1 || true")
       (run "read" "Reading your answer" "grep -q \"don't touch my saved networks\" ~/demo/5a.log")
       (say "Sorry: line 9 would have deleted every saved network. I've taken it out; asking again.")

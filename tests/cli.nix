@@ -124,7 +124,7 @@ in
   };
 
   testScript = ''
-    import json, time
+    import json
 
     REG = json.load(open("${../pkgs/by-name/omanix-cli/commands.json}"))
     MIRROR = None
@@ -327,6 +327,7 @@ in
         def chat_state():
             return json.loads(chat("state"))
         def wait_preview(state, timeout=30):
+            import time   # only this variant sleeps
             for _ in range(timeout * 2):
                 p = chat_state()["preview"]
                 if p and p["state"] == state:

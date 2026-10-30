@@ -1,5 +1,6 @@
 # omanix.menu.items: host entries in the default menu (§h.5). They are added
-# to $OMARCHY_PATH's intent menu by pkgs.omanix-menu (fork.nix → omanix-data);
+# to $OMARCHY_PATH's intent menu by pkgs.omanix-menu (fork.nix → omanix-data),
+# which also hides the omanix.menu.hidden rows (theme/default.nix: the lock);
 # the HM-owned ~/.config/omarchy/extensions/omarchy-menu.jsonc stays
 # upstream's comment-only template.
 { config, lib, ... }:
@@ -25,6 +26,13 @@ in
     default = { };
     example = lib.literalExpression ''{ "personal.notes" = { icon = "󰎞"; label = "Notes"; action = "omarchy-launch-editor ~/notes"; }; }'';
     description = "Extra entries for the default menu. IDs are dotted paths (`personal.notes` sits under `personal`).";
+  };
+
+  options.omanix.menu.hidden = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [ ];
+    internal = true;
+    description = "Menu row ids shown with `\"when\": \"false\"` (set by omanix modules, e.g. the theme lock). An id that is not in the menu fails the build.";
   };
 
   config = lib.mkIf cfg.enable {

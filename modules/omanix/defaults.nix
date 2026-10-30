@@ -22,7 +22,10 @@ let
     kitty = { package = pkgs.kitty; desktop = "kitty.desktop"; };
   };
   browsers = {
-    chromium = { package = pkgs.chromium; desktop = "chromium.desktop"; };   # apps/default.nix ships the alias upstream expects
+    # omanix.apps.chromium.package: the wrapper that reads chromium-flags.conf
+    # (apps/chromium.nix); apps/default.nix ships the chromium.desktop alias
+    # upstream expects.
+    chromium = { package = cfg.apps.chromium.package; desktop = "chromium.desktop"; };
     brave = { package = pkgs.brave; desktop = "brave-browser.desktop"; };
     firefox = { package = pkgs.firefox; desktop = "firefox.desktop"; };
     chrome = { package = pkgs.google-chrome; desktop = "google-chrome.desktop"; unfree = true; };

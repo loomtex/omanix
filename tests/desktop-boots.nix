@@ -3,7 +3,7 @@
 # home-manager's files in place (read-only) and the runtime overlays created.
 #
 # greeter = true: no autologin; SDDM's Wayland greeter (Hyprland with
-# upstream's greeter Lua, upstream's theme) comes up, and logging in through
+# upstream's greeter Lua, the omanix theme) comes up, and logging in through
 # it reaches the same session.
 { pkgs, loom, omanix, greeter ? false }:
 
@@ -52,14 +52,14 @@ pkgs.testers.runNixOSTest {
         diag(); raise
 
     ${if greeter then ''
-      with subtest("the SDDM greeter runs on Hyprland with the omarchy theme"):
+      with subtest("the SDDM greeter runs on Hyprland with the omanix theme"):
           try:
               machine.wait_until_succeeds("pgrep -u sddm -f 'yprland.* --config .*default/sddm/hyprland.lua'", timeout=T(120))
               machine.wait_until_succeeds("pgrep -u sddm -f '[s]ddm-greeter'", timeout=T(120))
           except Exception:
               diag(); raise
-          # the greeter was started with upstream's theme
-          machine.succeed("pgrep -u sddm -af 'sddm-greeter' | grep -q 'themes/omarchy'")
+          # the greeter was started with the omanix theme (theme/boot.nix)
+          machine.succeed("pgrep -u sddm -af 'sddm-greeter' | grep -q 'themes/omanix'")
           machine.sleep(5)
           machine.screenshot("greeter")
 

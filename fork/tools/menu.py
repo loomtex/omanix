@@ -3,11 +3,14 @@
 Runs in the nix sandbox with `python3 -I`; reads the pinned menu as data and
 executes nothing from it.
 
-  menu.py build <upstream.jsonc> <intents.toml> <menu-extra.jsonc> <host-items.json> <agent> <out-dir>
+  menu.py build <upstream.jsonc> <intents.toml> <menu-extra.jsonc> <host-items.json> <agent> <out-dir> [<hidden.json>]
       out-dir/omarchy-menu.jsonc   upstream order; gui rows unchanged (or with
                                    their override), intent rows lose `action`
                                    and gain `intent`/`skill`/`manual`, drop rows
-                                   are omitted; then menu-extra, then host items
+                                   are omitted; then menu-extra, then host items.
+                                   Ids in hidden.json (a list; omanix.menu.hidden,
+                                   e.g. the theme lock's rows) get "when": "false";
+                                   an id that is not in the menu fails the build.
       out-dir/intents.json         { id: {label, text, skill, manual, touches,
                                    provider?} } for `omarchy-shell omanix.chat
                                    intent <id>` and the Do-it-yourself view
@@ -57,7 +60,7 @@ def place(order, items, after):
             order.append(eid)
 
 
-def build(upstream, intents_path, extra_path, host_path, agent, out_dir):
+def build(upstream, intents_path, extra_path, host_path, agent, out_dir, hidden_path=None):
     menu = load_jsonc(upstream)
     rows = tomllib.load(open(intents_path, "rb"))["entry"]
     extra = load_jsonc(extra_path)
@@ -115,6 +118,12 @@ def build(upstream, intents_path, extra_path, host_path, agent, out_dir):
         out[eid] = e
         later.append((eid, e))
     place(order, later, after)
+    hidden = json.load(open(hidden_path)) if hidden_path else []
+    missing = sorted(h for h in hidden if h not in out)
+    if missing:
+        sys.exit("menu.py build: rows to hide are not in the menu: " + ", ".join(missing))
+    for eid in hidden:
+        out[eid] = dict(out[eid], when="false")
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "omarchy-menu.jsonc"), "w", encoding="utf-8") as f:
         f.write("{\n  // omanix: generated from the pinned omarchy-menu.jsonc, fork/intents.toml,\n"

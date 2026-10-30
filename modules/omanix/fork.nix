@@ -23,19 +23,27 @@ in
     data = lib.mkOption {
       type = lib.types.package;
       readOnly = true;
-      default = pkgs.omanix-data.override {
+      default = pkgs.omanix-data.override ({
         omarchy-src = cfg.fork.package;
         shellSettings = cfg.shell.settings;
         inherit (cfg) language release;
-        # The intent menu (W18, §h.5.2): upstream + intents.toml + menu-extra + omanix.menu.items.
+        # The intent menu (W18, §h.5.2): upstream + intents.toml + menu-extra +
+        # omanix.menu.items, with the omanix.menu.hidden rows hidden.
         menu = pkgs.omanix-menu.override {
           omarchy-src = cfg.fork.package;
           items = lib.mapAttrs (_: i: lib.filterAttrs (_: v: v != null) i) cfg.menu.items;
           agent = if config.loom.agent.enable or false then config.loom.agent.name else "your agent";
+          hidden = cfg.menu.hidden;
         };
-      };
+      } // cfg.fork.dataArgs);
       defaultText = lib.literalExpression "pkgs.omanix-data with this host's options";
       description = "`$OMARCHY_PATH`: the fork plus the files generated from this host's options (§f.2.9).";
+    };
+    dataArgs = lib.mkOption {
+      type = lib.types.attrsOf lib.types.anything;
+      default = { };
+      internal = true;
+      description = "More arguments for omanix-data from other omanix modules (theme/default.nix: the registry and the lock).";
     };
   };
 }

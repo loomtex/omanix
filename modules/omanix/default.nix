@@ -42,6 +42,8 @@ in
     ./runtime.nix
     ./session.nix
     ./shell.nix
+    ./theme
+    ./browser-policy.nix
     ./weather.nix
     ./welcome.nix
   ];

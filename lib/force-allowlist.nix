@@ -133,7 +133,7 @@
   }
   {
     option = "systemd.services.omanix-";
-    reason = "omanix's own units (trackpad reset, quirk oneshots)";
+    reason = "omanix's own units (trackpad reset, quirk oneshots, W16's browser policy writer)";
   }
   {
     option = "systemd.services.\"omanix-";
@@ -174,5 +174,14 @@
   {
     option = "i18n.inputMethod.fcitx5.addons";
     reason = "a list that only appends: upstream's input-method engines";
+  }
+  # ---- W16: themes, boot visuals, browser policy ----------------------------
+  {
+    option = "systemd.paths.omanix-";
+    reason = "omanix's own system path units (W16: the browser color spool)";
+  }
+  {
+    option = "users.groups.omanix-spool";
+    reason = "omanix's own group (the human may write the browser color spool)";
   }
 ]

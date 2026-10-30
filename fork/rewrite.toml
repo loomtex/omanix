@@ -51,13 +51,6 @@ to = "/run/current-system/sw/bin/\\1"
 count = 2
 
 [[rewrite]]
-file = "bin/omarchy-theme-set-browser-policy"
-regex = true
-from = "/usr/bin/(omarchy-[a-z0-9][a-z0-9-]*[a-z0-9])(?![A-Za-z0-9_-])"
-to = "/run/current-system/omarchy/bin/\\1"
-count = 1
-
-[[rewrite]]
 file = "bin/omarchy-theme-set-vscode"
 regex = true
 from = "/usr/bin/(?!omarchy-)([A-Za-z0-9_][A-Za-z0-9_.+-]*[A-Za-z0-9_+])(?![A-Za-z0-9_.+-])"
@@ -1331,4 +1324,40 @@ count = 1
 file = "bin/omarchy-restart-terminal"
 from = "  touch ~/.config/alacritty/alacritty.toml"
 to = "  touch \"${XDG_STATE_HOME:-$HOME/.local/state}/omanix/overlay/alacritty.toml\""
+count = 1
+
+# ---- Runtime redirects (W16; hand-written: gen-rewrite.py does not produce
+# these, so keep this block when regenerating the file above) -------------
+
+# Glass (§f.4.4, §f.5): the GTK 4 block goes to the overlay the HM gtk.css
+# imports, not to the read-only HM file.
+[[rewrite]]
+file = "bin/omarchy-theme-set-glass"
+from = 'gtk_css="${XDG_CONFIG_HOME:-$HOME/.config}/gtk-4.0/gtk.css"'
+to = 'gtk_css="${XDG_STATE_HOME:-$HOME/.local/state}/omanix/overlay/gtk4.css"'
+count = 1
+
+# Chromium feature toggle (P4, §f.4.4): the omanix chromium wrapper reads the
+# HM ~/.config/chromium-flags.conf and then this overlay.
+[[rewrite]]
+file = "bin/omarchy-chromium-add-feature"
+from = "conf=~/.config/chromium-flags.conf"
+to = 'conf="${XDG_STATE_HOME:-$HOME/.local/state}/omanix/overlay/chromium-flags.conf"'
+count = 1
+
+# Theme set: the official themes are store paths, whose directories are
+# read-only; a copy that keeps the mode can't be removed by the next switch.
+[[rewrite]]
+file = "bin/omarchy-theme-set"
+from = 'cp -r "$OMARCHY_THEMES_PATH/$THEME_NAME/"*'
+to = 'cp -r --no-preserve=mode "$OMARCHY_THEMES_PATH/$THEME_NAME/"*'
+count = 1
+
+# Terminal reload: nixpkgs wraps kitty, so its process is `.kitty-wrapped`
+# and upstream's `pgrep -x kitty` / `killall kitty` never reach it; a theme
+# switch left running kitty windows on the old colors (theme-switch).
+[[rewrite]]
+file = "bin/omarchy-restart-terminal"
+from = "if pgrep -x kitty >/dev/null; then\n  killall -SIGUSR1 kitty >/dev/null"
+to = "if pgrep -x '\\.?kitty(-wrapped)?' >/dev/null; then\n  pkill -SIGUSR1 -x '\\.?kitty(-wrapped)?' >/dev/null"
 count = 1

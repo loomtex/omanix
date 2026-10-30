@@ -1,4 +1,4 @@
-# quirk bcm43xx (fork/hw-quirks.toml): Broadcom BCM4360/BCM4331 Wi-Fi: the wl driver (unfree; the host must allow broadcom-sta).
+# quirk bcm43xx (fork/hw-quirks.toml): Broadcom BCM4360/BCM4331 Wi-Fi: the wl driver (unfree and marked insecure: allowed through loom.nixpkgs).
 # Upstream: install/hardware/fix-bcm43xx.sh.
 { config, lib, pkgs, ... }:
 
@@ -12,6 +12,10 @@ in
 
   config = lib.mkIf (config.omanix.enable && q.enable) {
     boot.extraModulePackages = [ config.boot.kernelPackages.broadcom_sta ];
+    # nixpkgs marks the unmaintained driver insecure; permitted by the exact
+    # name, which carries the kernel version.
+    loom.nixpkgs.allowUnfree = [ "broadcom-sta" ];
+    loom.nixpkgs.permittedInsecure = [ config.boot.kernelPackages.broadcom_sta.name ];
     boot.kernelModules = [ "wl" ];
     boot.blacklistedKernelModules = [ "b43" "bcma" "ssb" "brcmsmac" ];
   };

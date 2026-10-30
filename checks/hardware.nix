@@ -45,11 +45,34 @@ let
 
   on = names: { omanix.hardware.quirks = lib.genAttrs (map camel names) (_: { enable = true; }); };
   # Every quirk that doesn't bring a nixos-hardware kernel, on at once …
-  allQuirks = refWith [ ../hosts/fixtures/unfree.nix (on together) ];
+  allQuirks = refWith [ (on together) ];
   # … and each nixos-hardware one on its own, with its module imported.
   alone = lib.mapAttrs (n: q: refWith [ nh.${q.nixos-hardware} (on [ n ]) ]) needsNixosHardware;
   # Without the nixos-hardware module, the quirk says what to import.
   surfaceWithoutNh = refWith [ (on [ "surface" ]) ];
+
+  # The unfree/insecure allowlists compose: a host with every unfree thing
+  # omanix offers evaluates with nothing but loom setting nixpkgs.config.
+  unfreeHost = refWith [
+    (on [ "nvidia" "bcm43xx" "intel-ipu7-camera" ])
+    { omanix.apps.obsidian.enable = true; omanix.defaults = { browser = "chrome"; editor = "code"; }; }
+  ];
+  # nixpkgs.config definitions (other than loom's own) that would replace
+  # loom's predicate or insecure list (recursiveUpdate, not a list merge).
+  allowKeys = [ "allowUnfree" "allowUnfreePredicate" "permittedInsecurePackages" "allowInsecurePredicate" ];
+  configSetters = h: lib.concatMap (d:
+    lib.optional (!(lib.hasSuffix "/modules/loom/nixpkgs.nix" d.file) && lib.any (k: d.value ? ${k}) allowKeys)
+      "${d.file} sets nixpkgs.config.{${lib.concatStringsSep "," (lib.filter (k: d.value ? ${k}) allowKeys)}}")
+    h.options.nixpkgs.config.definitionsWithLocations;
+  unfreeErrors = h:
+    let pkgNames = names h.config.environment.systemPackages; in
+    evaluates h
+    ++ configSetters h
+    ++ map (n: "${n} is not in loom.nixpkgs.allowUnfree")
+      (lib.filter (n: !(builtins.elem n h.config.loom.nixpkgs.allowUnfree))
+        [ "nvidia-x11" "broadcom-sta" "ipu7-camera-bins" "obsidian" "google-chrome" "vscode" ])
+    ++ lib.optional (h.config.loom.nixpkgs.permittedInsecure == [ ]) "broadcom-sta is not in loom.nixpkgs.permittedInsecure"
+    ++ map (n: "${n} is not installed") (lib.filter (n: !(builtins.elem n pkgNames)) [ "obsidian" "google-chrome" "vscode" ]);
 
   hostFor = n: alone.${n} or allQuirks;
   cfgOf = n: (hostFor n).config // { _options = (hostFor n).options; };
@@ -128,6 +151,12 @@ in
     ++ lib.optional (reviewerOff.config.users.users ? reviewer) "the reviewer exists with loom.reviewer.enable = false");
   eval-omanix-lanzaboote = c.mkCheck pkgs "eval-omanix-lanzaboote" (evaluates lanza
     ++ lib.optional (!lanza.config.boot.lanzaboote.enable) "lanzaboote is off");
+
+  # loom.nixpkgs.{allowUnfree,permittedInsecure}: nvidia, bcm43xx (unfree
+  # and insecure), ipu7, obsidian, chrome and code allow themselves; the
+  # quirk fixtures (ref-nvidia, every quirk on) don't set nixpkgs.config.
+  eval-unfree-allowlists = c.mkCheck pkgs "eval-unfree-allowlists" (unfreeErrors unfreeHost
+    ++ configSetters hosts.ref-nvidia ++ configSetters allQuirks);
 
   # §f.2.6: coverage of upstream's hardware scripts, a module per v1 row that
   # evaluates and does what its row says, U26 and U27, and (through the

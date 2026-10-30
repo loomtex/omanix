@@ -164,6 +164,14 @@
     reason = "a list that only appends: the post-promotion settle and reload (§f.4.6)";
   }
   {
+    option = "loom.nixpkgs.allowUnfree";
+    reason = "a list that only appends: the unfree packages an enabled quirk, app or default needs";
+  }
+  {
+    option = "loom.nixpkgs.permittedInsecure";
+    reason = "a list that only appends: broadcom-sta for the bcm43xx quirk";
+  }
+  {
     option = "i18n.inputMethod.fcitx5.addons";
     reason = "a list that only appends: upstream's input-method engines";
   }

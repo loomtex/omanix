@@ -1,4 +1,4 @@
-# quirk nvidia (fork/hw-quirks.toml): NVIDIA GPUs: the proprietary driver (open kernel modules on GSP GPUs), KMS (unfree; the host must allow it).
+# quirk nvidia (fork/hw-quirks.toml): NVIDIA GPUs: the proprietary driver (open kernel modules on GSP GPUs), KMS (unfree: allowed through loom.nixpkgs.allowUnfree).
 # Upstream: install/hardware/nvidia.sh.
 { config, lib, pkgs, ... }:
 
@@ -23,6 +23,7 @@ in
       open = lib.mkDefault q.open;
       modesetting.enable = lib.mkDefault true;
     };
+    loom.nixpkgs.allowUnfree = [ "nvidia-x11" "nvidia-settings" "nvidia-persistenced" ];
     # Per-session Hyprland env: upstream's default/hypr/nvidia.lua.
   };
 }

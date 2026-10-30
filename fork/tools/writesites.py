@@ -71,6 +71,9 @@ def iter_files(tree: Path):
                 yield p
 
 
+MENU_ACTION = re.compile(r'"action"\s*:\s*"((?:[^"\\]|\\.)*)"')
+
+
 def scan(tree: Path) -> list[dict]:
     sites = []
     redirect = re.compile(r"(?<![<>=&])>{1,2}\s*" + PATH_TOKEN)
@@ -82,10 +85,18 @@ def scan(tree: Path) -> list[dict]:
         except OSError:
             continue
         rel = str(f.relative_to(tree))
+        is_menu = rel.endswith(".jsonc")
         for n, line in enumerate(text.splitlines(), 1):
             s = line.strip()
             if not s or s.startswith(("#", "--", "//")):
                 continue
+            if is_menu:
+                # A menu row runs only its "action"; its key, label, intent text
+                # and when/disabled tests don't write ("install.service.x" isn't
+                # an install(1) call).
+                line = " ; ".join(MENU_ACTION.findall(line))
+                if not line:
+                    continue
             hits = []
             for m in redirect.finditer(line):
                 hits.append(("redirect", m.group("p")))

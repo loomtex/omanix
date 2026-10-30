@@ -49,9 +49,15 @@ in
     description = "Use the shell's approval card (omanix-approval-prompt) as the human's nuketown prompter. false keeps nuketown's built-in zenity dialog.";
   };
 
-  config = lib.mkIf cfg.enable {
-    home-manager.users.${user}.nuketown.approvalDaemon.prompter =
-      lib.mkIf (cfg.approval.prompter && config.loom.agent.enable) (lib.mkDefault "${prompt}/bin/omanix-approval-prompt");
-    environment.systemPackages = [ passwd ];
-  };
+  config = lib.mkMerge [
+    (lib.mkIf cfg.enable {
+      environment.systemPackages = [ passwd ];
+    })
+    # Only hosts with an agent have nuketown's home-manager options: the guard
+    # must sit outside the definition, or a host with no agent fails to eval.
+    (lib.mkIf (cfg.enable && cfg.approval.prompter && config.loom.agent.enable) {
+      home-manager.users.${user}.nuketown.approvalDaemon.prompter =
+        lib.mkDefault "${prompt}/bin/omanix-approval-prompt";
+    })
+  ];
 }

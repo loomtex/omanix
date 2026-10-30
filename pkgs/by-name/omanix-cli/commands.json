@@ -1,0 +1,184 @@
+{
+  "schema": "omanix.commands/v1",
+  "exitCodes": {
+    "0": "ok",
+    "1": "failed",
+    "2": "usage, or refused by a guard (edit by hand)",
+    "3": "needs human approval (a card is waiting)",
+    "4": "rolled back",
+    "5": "offline, busy, or try again later"
+  },
+  "commands": {
+    "core": {
+      "context": {
+        "description": "First command of every session: host, generation, deployed commit, working copy, plugins, last switch, runtime summary, enrollment, key rotation, catalogs, skills.",
+        "args": [],
+        "output": {"required": ["host", "generation", "workingCopy", "plugins", "lastSwitch", "runtime", "enrollment", "sekRotation", "catalog", "skills"],
+                   "properties": {"plugins": {"type": "array"}, "skills": {"type": "array"}, "enrollment": {"type": "object"}}}
+      },
+      "options": {
+        "description": "Full-text search over the option catalogs: path, type, default, origin, description.",
+        "args": [{"name": "query", "nargs": "*", "help": "words to search for"},
+                 {"name": "--origin", "help": "only options from this origin (nixpkgs, loom, omanix, home-manager, input:<name>, host:<file>)"},
+                 {"name": "--limit", "type": "int", "default": 50, "help": "at most this many results"}],
+        "output": {"required": ["query", "results", "total"], "properties": {"results": {"type": "array"}, "total": {"type": "integer"}}}
+      },
+      "where": {
+        "description": "Where an option or a home file is defined: a live eval of the working copy (file:line, priority, value per definition; editable or not). For an HM-owned file: the owning option, the overlay and what shadows it.",
+        "args": [{"name": "target", "help": "an option path (omanix.theme.default, home.packages) or a home file (~/.config/hypr/monitors.lua)"}],
+        "output": {"required": ["target", "kind"], "properties": {"kind": {"enum": ["option", "group", "missing", "file"]}, "definitions": {"type": "array"}}}
+      },
+      "explain": {
+        "description": "An option's catalog entry, its definitions (where) and its current value.",
+        "args": [{"name": "option", "help": "an option path"}],
+        "output": {"required": ["target", "kind", "catalog"], "properties": {"kind": {"enum": ["option", "group", "missing"]}}}
+      },
+      "set": {
+        "description": "Set an option in the working copy: rewrite its one literal host definition in place, or add it under the marker of configuration.nix (home.nix for home.* paths); evaluates the result and reverts on a mismatch. Refuses (exit 2, file:line each) when several host files or an expression define it.",
+        "args": [{"name": "path", "help": "option path"}, {"name": "value", "help": "the value as JSON (\"\\\"kanagawa\\\"\", 4, true, [\"a\"])"}],
+        "output": {"required": ["path", "value", "action", "file", "shadowedBy"], "properties": {"action": {"enum": ["rewrote", "appended", "unchanged"]}, "shadowedBy": {"type": "array"}}}
+      },
+      "unset": {
+        "description": "Remove the one literal host definition of an option from the working copy, so the default applies again.",
+        "args": [{"name": "path", "help": "option path"}],
+        "output": {"required": ["path", "action", "file"], "properties": {"action": {"enum": ["deleted", "unchanged"]}}}
+      },
+      "check": {
+        "description": "Evaluate (assertions, warnings), check the generated key files against keys.nix, and build the working copy's system. Run before every proposal.",
+        "args": [{"name": "--no-build", "action": "store_true", "help": "evaluate only"}],
+        "output": {"required": ["eval", "keysSync", "build"], "properties": {"eval": {"type": "object"}, "build": {"type": "object"}}}
+      },
+      "plan": {
+        "description": "check, then what would change: nvd diff against the running system and the git diff stat against the deployed commit.",
+        "args": [],
+        "output": {"required": ["eval", "build", "nvd", "gitStat"]}
+      },
+      "propose": {
+        "description": "Propose the committed working copy: pushes gate/<topic> and asks for the switch with `loom propose`; the human approves on a card. Waits for the decision unless --no-wait (exit 3: card waiting).",
+        "args": [{"name": "--request", "help": "the human's words, verbatim (shown on the card)"},
+                 {"name": "--no-wait", "action": "store_true", "help": "return once the card is up (exit 3)"},
+                 {"name": "--ref", "default": "HEAD", "help": "commit to propose"}],
+        "output": {"required": ["tip", "request", "result"], "properties": {"result": {"enum": ["applied", "denied", "rolled-back", "refused", "waiting", "failed"]}}}
+      },
+      "update": {
+        "description": "Move omanix (or a named input) to its newest release tag (or newest rev), commit, and propose (\"Update ready\").",
+        "args": [{"name": "input", "nargs": "?", "default": "omanix", "help": "flake input (default omanix)"},
+                 {"name": "--no-propose", "action": "store_true", "help": "commit only"}],
+        "output": {"required": ["input", "from", "to", "changed"]}
+      },
+      "status": {
+        "description": "Failed units, persistence gaps, sops decryptability and runtime overlays that shadow declared settings.",
+        "args": [],
+        "output": {"required": ["failedUnits", "secrets", "shadowing", "generation"], "properties": {"failedUnits": {"type": "array"}}}
+      },
+      "doctor": {
+        "description": "Human session: HM links not from the current generation, non-empty overlays and the declared keys they shadow, rebase conflicts, ~/.local/state/hypr shadow files, reclaimed files, overlays left unsettled.",
+        "args": [],
+        "output": {"required": ["problems", "overlays", "hmLinks", "reclaimed"], "properties": {"problems": {"type": "array"}, "overlays": {"type": "array"}}}
+      },
+      "why-failed": {
+        "description": "Why the last thing failed: the last switch's rollback check and journal excerpt, or the most recent failed unit with its log.",
+        "args": [{"name": "--last", "action": "store_true", "help": "only the last switch"},
+                 {"name": "unit", "nargs": "?", "help": "a unit name"}],
+        "output": {"required": ["subject", "log"]}
+      },
+      "try": {
+        "description": "Preview a look-and-feel value live, without a commit (typed allowlist: catalog/preview.json). The human allows it in the chat panel. --reset reverts.",
+        "args": [{"name": "path", "nargs": "?", "help": "an allow-listed option path"},
+                 {"name": "value", "nargs": "?", "help": "the value as JSON"},
+                 {"name": "--reset", "action": "store_true", "help": "revert every preview"}],
+        "output": {"required": ["path", "delivered"]}
+      },
+      "reset": {
+        "description": "Human session: empty runtime overlays (backup in the reclaim dir): an area (look, hypr, shell, theme, font, monitors, input), an overlay path, or --all.",
+        "args": [{"name": "targets", "nargs": "*", "help": "areas or overlay paths"},
+                 {"name": "--all", "action": "store_true", "help": "every overlay"}],
+        "output": {"required": ["reset"], "properties": {"reset": {"type": "array"}}}
+      },
+      "edit": {
+        "description": "Human session: open the overlay for an HM-owned file in the editor; for an HM file without one, show it read-only and name the option that controls it.",
+        "args": [{"name": "path", "help": "a home file or overlay path (hypr/monitors.lua, ~/.config/kitty/kitty.conf)"},
+                 {"name": "--print", "action": "store_true", "help": "print what would open; don't start an editor"}],
+        "output": {"required": ["path", "kind", "open"], "properties": {"kind": {"enum": ["overlay", "read-only", "unknown"]}}}
+      },
+      "intent": {
+        "description": "Human session: pre-fill the chat composer with a menu intent (ids in $OMARCHY_PATH/default/omanix/intents.json).",
+        "args": [{"name": "id", "help": "intent id, e.g. setup.default.browser.firefox"}],
+        "output": {"required": ["id", "text"]}
+      }
+    },
+    "plugin": {
+      "inspect": {
+        "description": "Vet a plugin flake without evaluating its modules: outputs, declared inputs, latest tag, whether its owner is already in this host's lock.",
+        "args": [{"name": "flakeref", "help": "github:owner/repo, git+https://…, …"}],
+        "output": {"required": ["flakeref", "outputs", "inputs", "latestTag", "ownerInLock"]}
+      },
+      "add": {
+        "description": "Add a plugin: a flake input (follows for nixpkgs/home-manager/omanix when declared; prefers a tag), its lock node only, and the import in modules/plugins.nix (or home.nix with --home). Sets no option values.",
+        "args": [{"name": "flakeref"},
+                 {"name": "--module", "default": "default", "help": "module output name"},
+                 {"name": "--home", "action": "store_true", "help": "import its homeModules.<module> in home.nix"},
+                 {"name": "--name", "help": "input name (default: the repo name)"},
+                 {"name": "--branch", "action": "store_true", "help": "allow a branch ref (shown on the card)"}],
+        "output": {"required": ["input", "url", "follows", "imports", "lockNodes"]}
+      },
+      "remove": {
+        "description": "Remove a plugin: its import lines, its input and its lock node. Leftover option values become eval errors with file:line.",
+        "args": [{"name": "input"}],
+        "output": {"required": ["input", "removed"]}
+      }
+    },
+    "app": {
+      "add": {
+        "description": "Add an app: an omarchy app (omanix.apps.<n>.enable), a web app (--url), a TUI (--command), else a nixpkgs package in home.nix (checked with meta.mainProgram).",
+        "args": [{"name": "name"}, {"name": "--url", "help": "web app URL"}, {"name": "--command", "help": "TUI command"},
+                 {"name": "--icon", "help": "icon name"}],
+        "output": {"required": ["name", "kind", "path", "file"], "properties": {"kind": {"enum": ["omarchy", "webapp", "tui", "package"]}}}
+      },
+      "remove": {
+        "description": "Remove an app added with app add (or turn an omarchy app off).",
+        "args": [{"name": "name"}],
+        "output": {"required": ["name", "kind", "file"]}
+      }
+    },
+    "secret": {
+      "set": {
+        "description": "Encrypt a secret value into secrets/<file>.yaml (encrypt-only; never echoed or decrypted). The value comes from stdin: the chat panel's secure field, or the human's terminal.",
+        "args": [{"name": "file", "help": "host, user, data or agents"}, {"name": "name", "help": "key in the file"}],
+        "output": {"required": ["file", "name", "created"]}
+      }
+    },
+    "persist": {
+      "add": {
+        "description": "Persist a path across reboots: appends it to loom.persist.system.directories (or files) in modules/persist.nix.",
+        "args": [{"name": "path"}, {"name": "--file", "action": "store_true", "help": "a file, not a directory"}],
+        "output": {"required": ["path", "file", "changed"]}
+      },
+      "audit": {
+        "description": "Files written on the tmpfs root that no persistence entry covers (they vanish at reboot), with the owning unit where known.",
+        "args": [],
+        "output": {"required": ["uncovered", "root"], "properties": {"uncovered": {"type": "array"}}}
+      }
+    },
+    "hw": {
+      "probe": {
+        "description": "Which hardware quirks match this machine; --write enables them in the working copy's hardware.nix.",
+        "args": [{"name": "--write", "action": "store_true"}, {"name": "--all", "action": "store_true", "help": "include deferred quirks"}],
+        "output": {"required": ["quirks", "written"], "properties": {"quirks": {"type": "array"}}}
+      }
+    },
+    "repo": {
+      "open": {
+        "description": "Human: open the working copy ~/omanix-host (cloned from the local mirror on demand) in the editor, at a file or option.",
+        "args": [{"name": "file", "nargs": "?", "help": "a file, or an option path (opens where it is defined)"},
+                 {"name": "--print", "action": "store_true", "help": "print the path; don't start an editor"}],
+        "output": {"required": ["path", "created", "open"]}
+      },
+      "path": {
+        "description": "The working copy's path (created from the local mirror on demand with --ensure).",
+        "args": [{"name": "--ensure", "action": "store_true"}],
+        "output": {"required": ["path", "exists", "created"]}
+      }
+    }
+  }
+}

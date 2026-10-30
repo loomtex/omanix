@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omanix-cli"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[project.scripts]
+omanix = "omanix_cli:main"
+omanix-preview = "omanix_cli.preview:main"
+
+[tool.setuptools]
+packages = ["omanix_cli"]
+
+[tool.setuptools.package-data]
+omanix_cli = ["eval.nix", "commands.json"]

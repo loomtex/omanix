@@ -3,6 +3,12 @@
   wayland, wayland-protocols, wayland-scanner, libdeflate, tesseract, wl-clipboard,
 }:
 
+let
+  # Upstream ships tesseract with tesseract-data-eng only; the default
+  # nixpkgs tesseract carries every language (~1 GiB, checks.closure-budget).
+  # The same expression as omanix.packages.base, so it is one store path.
+  ocr = tesseract.override { enableLanguages = [ "eng" ]; };
+in
 stdenv.mkDerivation (finalAttrs: {
   pname = "omasnap";
   version = "1.24.0";
@@ -17,7 +23,7 @@ stdenv.mkDerivation (finalAttrs: {
   nativeBuildInputs = [ cmake ninja pkg-config wayland-scanner qt6.wrapQtAppsHook ];
   buildInputs = [
     qt6.qtbase qt6.qtwayland kdePackages.layer-shell-qt
-    wayland wayland-protocols libdeflate tesseract
+    wayland wayland-protocols libdeflate ocr
   ];
   cmakeBuildType = "Release";
 
@@ -27,7 +33,7 @@ stdenv.mkDerivation (finalAttrs: {
   '';
 
   # OCR and copy-to-clipboard shell out at runtime.
-  qtWrapperArgs = [ "--prefix PATH : ${lib.makeBinPath [ tesseract wl-clipboard ]}" ];
+  qtWrapperArgs = [ "--prefix PATH : ${lib.makeBinPath [ ocr wl-clipboard ]}" ];
 
   meta = {
     description = "Native Wayland screenshot and annotation overlay for Hyprland";

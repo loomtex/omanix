@@ -1,0 +1,58 @@
+{
+  "schema": "loom.answers/v1",
+  "flavor": "omanix",
+  "host": {
+    "id": "5c2757de0e0a4dca819bee2974c03c1c",
+    "name": "example"
+  },
+  "user": {
+    "name": "alice",
+    "fullName": "Alice Example",
+    "email": "alice@example.org"
+  },
+  "locale": {
+    "timeZone": "UTC",
+    "keyMap": "us",
+    "language": "en_US.UTF-8"
+  },
+  "agent": {
+    "name": "ada",
+    "harness": "claude-code",
+    "sudo": "listed"
+  },
+  "humans": {
+    "alice": {
+      "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAMLIzBWFErPQVAwouoB+KoZCRe8MpP6Tkc5GKiWXzpN alice@example",
+      "owner": true
+    }
+  },
+  "machine": {
+    "device": "/dev/disk/by-id/nvme-Example_SSD_0000000000000000",
+    "btrfsUuid": "0f2c9a1e-5b7d-4c3a-9e8f-1a2b3c4d5e6f",
+    "unlockMethods": [
+      "recovery",
+      "passphrase"
+    ],
+    "secureBoot": false,
+    "recipients": {
+      "host": "age19d2vspt8g0frrzgueqtmg9qx9mv73kzvvm3m67vgy0wwdcw6ag9quupmfj",
+      "recovery": "age1mdlg6348khh02r2qlrlrmkhl4dn4r8x9r75ewjs6at9uflzhvqpsp7vhm5"
+    },
+    "recoveryFingerprint": "5be1c0a4d3f2e1b0",
+    "stateVersion": "26.05"
+  },
+  "keys": {
+    "host": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHNiGuZ+v/oIJopVZurK7B7sMXTjTXf8S4qPl6iR5uDu root@example",
+    "agents": {
+      "ada": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICipBz6vu42lYIUv+NT+8Zu/z2XpBEE+fgXR81YBkWGn ada@example"
+    }
+  },
+  "defaults": {
+    "terminal": "kitty",
+    "browser": "chromium",
+    "editor": "nvim"
+  },
+  "apps": [
+    "localsend"
+  ]
+}

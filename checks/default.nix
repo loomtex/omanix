@@ -44,6 +44,7 @@ in
 // import ./hardware.nix { inherit pkgs self inputs; }
 // import ./theme.nix { inherit pkgs self inputs; }
 // import ./cli.nix { inherit pkgs self inputs; }
+// import ./installer.nix { inherit pkgs self inputs; }
 // lib.mapAttrs' (n: v: lib.nameValuePair "pkg-${n}" v)
   # the installer images and their cache are checks.closure-budget's, once
   (lib.filterAttrs (n: _: !(builtins.elem n [ "default" "installer-offline" "installer-net" "installer-test" "base-cache" "stick-index" ]))

@@ -3,6 +3,7 @@ converses; this acts. Every subcommand prints one JSON object with --json.
 
   configure ids         [--machine-id M]
   configure mint        --answers A --owner-key K --work W [--machine-id M] [--state-dir D]
+  configure mint        --resume --id ID --owner-key K [--state-dir D]
                         loom-mint with the omanix template and hostgen catalog
   configure check       --repo W [--index stick-index.txt]… [--cache DIR]…
                         evaluate the host offline-capably; cacheMiss = what an
@@ -66,6 +67,16 @@ def cmd_ids(a, s):
 
 
 def cmd_mint(a, s):
+    if a.resume:
+        # after a network error: push the existing mint commit again (§e.2 step 3.8)
+        if not a.id:
+            raise ConfigureError("--resume needs --id")
+        args = ["loom-mint", "mint", "--resume", "--id", a.id, "--owner-key", a.owner_key, "--json", *common(a, s)]
+        if a.state_dir:
+            args += ["--state-dir", a.state_dir]
+        return json.loads(run(args).strip().splitlines()[-1])
+    if not a.answers or not a.work:
+        raise ConfigureError("mint needs --answers and --work (or --resume --id)")
     answers = json.load(open(a.answers))
     if answers.get("flavor", "omanix") != "omanix":
         raise ConfigureError(f"these answers are for the {answers.get('flavor')} flavor, not omanix")
@@ -215,8 +226,8 @@ def main(argv=None):
     req = lambda *n: (n, {"required": True})
     opt = lambda *n, **kw: (n, kw)
     p("ids", opt("--machine-id"))
-    p("mint", req("--answers"), req("--owner-key"), req("--work"), opt("--machine-id"), opt("--state-dir"),
-      opt("--template"), opt("--catalog"))
+    p("mint", opt("--answers"), req("--owner-key"), opt("--work"), opt("--machine-id"), opt("--state-dir"),
+      opt("--template"), opt("--catalog"), opt("--resume", action="store_true"), opt("--id"))
     chk = [req("--repo"), opt("--index", action="append"), opt("--cache", action="append"), opt("--lock"),
            opt("--check-module")]
     p("check", *chk)

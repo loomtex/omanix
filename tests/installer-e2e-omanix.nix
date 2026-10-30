@@ -39,7 +39,9 @@ let
     agent = { name = "ada"; harness = "claude-code"; sudo = "listed"; };
     humans.alice = { key = "@OWNER@"; owner = true; };
     theme = "tokyo-night";
-    defaults = { terminal = "kitty"; browser = "chromium"; editor = "nvim"; };
+    # the reference host's choices: what the release stick carries (another
+    # terminal or browser is a cacheMiss, staged by `configure stage-cache`)
+    defaults = { terminal = "alacritty"; browser = "chromium"; editor = "nvim"; };
     apps = [ "localsend" ];
   });
 

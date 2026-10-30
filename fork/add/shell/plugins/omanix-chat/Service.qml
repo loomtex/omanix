@@ -46,6 +46,18 @@ Item {
   property var intents: ({})
   property bool bubbleOpen: false
 
+  // Agent-requested previews (§h.6): the latest one, for the panel and tests.
+  // state: checking | asked | refused | applying | previewing | kept | reverted | declined
+  property var preview: null
+
+  // The options browser (§h.6): `omanix options` over the catalogs, and the
+  // current values from the running system's config.json.
+  property string optionsQuery: ""
+  property var optionsResults: []
+  property int optionsTotal: 0
+  property bool optionsBusy: false
+  property var currentConfig: ({})
+
   ListModel { id: transcriptModel }
   readonly property var transcript: transcriptModel
 
@@ -60,6 +72,11 @@ Item {
     path: "/etc/omanix/chips/rules.json"
     printErrors: false
     onLoaded: { try { root.rules = JSON.parse(text()) } catch (e) { root.rules = ({}) } }
+  }
+  FileView {
+    path: "/run/current-system/catalog/config.json"
+    printErrors: false
+    onLoaded: { try { root.currentConfig = JSON.parse(text()) } catch (e) { root.currentConfig = ({}) } }
   }
   FileView {
     path: root.omarchyPath + "/default/omanix/intents.json"
@@ -98,6 +115,18 @@ Item {
     sock.write(JSON.stringify(obj) + "\n")
     sock.flush()
     return true
+  }
+
+  // Tests and the demo: the kinds of the last rows, and the activity rail's
+  // labels and notices (never what the human or the agent wrote).
+  function rowSummary() {
+    var out = []
+    for (var i = Math.max(0, transcriptModel.count - 60); i < transcriptModel.count; i++) {
+      var r = transcriptModel.get(i)
+      out.push(r.kind === "activity" || r.kind === "applied" || r.kind === "rolledback" || r.kind === "notice" || r.kind === "preview" || r.kind === "error"
+        ? { kind: r.kind, text: r.text } : { kind: r.kind })
+    }
+    return out
   }
 
   function add(kind, text, detail, data) {
@@ -149,6 +178,7 @@ Item {
     case "applied": bubbleOpen = false; add("applied", "Applied: " + String(e.tip || "").slice(0, 12), e.check); break
     case "rolledback": bubbleOpen = false; add("rolledback", "Rolled back: " + String(e.check || "a health check failed"), e.tip); break
     case "error": bubbleOpen = false; add("error", e.text); break
+    case "preview-request": bubbleOpen = false; previewRequested(e); break
     case "attached": attachmentDone(String(e.ref || ""), String(e.id || ""), ""); break
     case "attach-rejected": attachmentDone(String(e.ref || ""), "", String(e.reason || "refused")); break
     }
@@ -269,6 +299,137 @@ Item {
 
   function removeAttachment(ref) { attachments = attachments.filter(function(a) { return a.ref !== ref }) }
 
+  // ---- agent-requested previews (§h.6) -----------------------------------
+  // The resident has no Wayland access: `omanix try` reaches us as data
+  // ({path, value} or {reset}). omanix-preview (the human-session helper)
+  // checks it against catalog/preview.json and renders the change itself;
+  // the row shows its rendering, never text from the request. Allow applies
+  // it; Keep leaves it as runtime state (Make it stick from there); Revert,
+  // or closing the panel while it's still a preview, undoes it.
+
+  function previewRequested(e) {
+    if (e.reset === true) {
+      if (preview && (preview.state === "previewing")) previewRun("reset", [], "reverted")
+      add("notice", root.agent + " reverted its preview")
+      return
+    }
+    var p = { id: "p" + Date.now(), path: String(e.path || ""), value: e.value, label: "", state: "checking", reason: "" }
+    preview = p
+    add("preview", "", "checking", { id: p.id })
+    previewRun("check", [p.path, JSON.stringify(p.value)], "asked")
+  }
+
+  function setPreview(changes) {
+    if (!preview) return
+    var n = {}
+    for (var k in preview) n[k] = preview[k]
+    for (var c in changes) n[c] = changes[c]
+    preview = n
+    for (var i = transcriptModel.count - 1; i >= 0; i--) {
+      var row = transcriptModel.get(i)
+      if (row.kind === "preview" && JSON.parse(row.payload).id === n.id) {
+        transcriptModel.setProperty(i, "text", n.label || n.reason)
+        transcriptModel.setProperty(i, "detail", n.state)
+        break
+      }
+    }
+  }
+
+  // verb: check | apply | reset; next: the state on success
+  function previewRun(verb, args, next) {
+    previewComponent2.createObject(root, { verb: verb, next: next, command: ["omanix-preview", verb].concat(args) })
+  }
+
+  Component {
+    id: previewComponent2
+    Process {
+      property string verb
+      property string next
+      running: true
+      stdout: StdioCollector {
+        waitForEnd: true
+        onStreamFinished: {
+          var r
+          try { r = JSON.parse(String(text || "{}")) } catch (e) { r = { ok: false, refused: "the preview helper didn't answer" } }
+          if (verb === "reset") { root.setPreview({ state: next }); return }
+          if (r.ok) root.setPreview({ state: next, label: String(r.label || "") })
+          else root.setPreview({ state: verb === "check" ? "refused" : "failed", reason: String(r.refused || "refused") })
+        }
+      }
+      onExited: destroy()
+    }
+  }
+
+  // Undo the last change: `loom undo` as the human (polkit farm.loom.undo in
+  // the active session), which raises the routine "Undo: …" card.
+  function undoLast() { Quickshell.execDetached(["loom", "undo"]) }
+
+  // The panel closed: a preview nobody kept goes back.
+  function panelClosed() {
+    if (preview && preview.state === "previewing") previewRun("reset", [], "reverted")
+  }
+
+  // Allow | Not now | Keep | Revert, on the latest request.
+  function previewAnswer(action) {
+    if (!preview) return "no preview"
+    var st = preview.state
+    if (action === "allow" && st === "asked") { setPreview({ state: "applying" }); previewRun("apply", [preview.path, JSON.stringify(preview.value)], "previewing") }
+    else if (action === "notnow" && st === "asked") setPreview({ state: "declined" })
+    else if (action === "keep" && st === "previewing") setPreview({ state: "kept" })
+    else if (action === "revert" && st === "previewing") previewRun("reset", [], "reverted")
+    else return "not now (" + st + ")"
+    return "ok"
+  }
+
+  // ---- options browser ---------------------------------------------------
+
+  function currentValue(path) {
+    var v = currentConfig
+    var parts = String(path).split(".")
+    for (var i = 0; i < parts.length; i++) {
+      if (v === null || typeof v !== "object" || !(parts[i] in v)) return undefined
+      v = v[parts[i]]
+    }
+    return v
+  }
+
+  Timer { id: optionsDebounce; interval: 350; onTriggered: root.searchOptionsNow() }
+  onOptionsQueryChanged: optionsDebounce.restart()
+
+  function searchOptionsNow() {
+    var words = optionsQuery.trim().split(/\s+/).filter(function(w) { return w.length > 0 && w.charAt(0) !== "-" })
+    if (words.join("").length < 2) { optionsResults = []; optionsTotal = 0; return }
+    if (optionsProc.running) optionsProc.running = false
+    optionsProc.command = ["omanix", "options", "--json", "--limit", "40"].concat(words)
+    optionsBusy = true
+    optionsProc.running = true
+  }
+
+  Process {
+    id: optionsProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        root.optionsBusy = false
+        var r
+        try { r = JSON.parse(String(text || "{}")) } catch (e) { r = {} }
+        root.optionsResults = (r.results || []).map(function(o) {
+          var cur = root.currentValue(o.path)
+          return { path: String(o.path), type: String(o.type || ""), origin: String(o.origin || ""),
+            description: String(o.description || ""), current: cur === undefined ? "" : JSON.stringify(cur),
+            hasCurrent: cur !== undefined, def: o["default"] === undefined || o["default"] === null ? "" : String(typeof o["default"] === "string" ? o["default"] : JSON.stringify(o["default"])) }
+        })
+        root.optionsTotal = r.total || 0
+      }
+    }
+  }
+
+  // "Ask ada to change it": a pre-filled, unsent request.
+  function askToChange(o) {
+    var from = o.hasCurrent ? " (now " + o.current + ")" : ""
+    prefill({ source: "options browser", text: "Change " + o.path + from + " to " })
+  }
+
   // ---- facts for the chips (local state only) --------------------------
 
   Process {
@@ -326,6 +487,14 @@ Item {
     }
     function intent(id: string): string { return root.intent(id) }
     function whatCanIChange(): void { root.view = "options"; root.openPanel() }
+    function searchOptions(query: string): void { root.view = "options"; root.optionsQuery = query; root.openPanel() }
+    function askOption(n: int): string {
+      if (n < 0 || n >= root.optionsResults.length) return "no result " + n
+      root.askToChange(root.optionsResults[n]); return "ok"
+    }
+    function preview(action: string): string { return root.previewAnswer(action) }
+    // The applied row's Undo (tests drive it here; the button runs the same).
+    function undo(): string { root.undoLast(); return "ok" }
     function agent(): void { root.view = "agent"; root.openPanel() }
     function makeItStick(area: string): void {
       root.prefill({ source: "make it stick", id: "appearance.make-it-stick", text: "Make my current " + area + " settings permanent.", skill: "look" })
@@ -337,7 +506,11 @@ Item {
     function state(): string {
       return JSON.stringify({ connected: root.connected, detached: root.detached, boot: root.boot, lastSeq: root.lastSeq,
         status: root.chatState, view: root.view, open: root.isOpen(), composer: root.composerText, source: root.source,
-        items: root.transcript.count, attachments: root.attachments.length, chips: root.chips.map(function(c) { return c.label }) })
+        items: root.transcript.count, attachments: root.attachments.length, chips: root.chips.map(function(c) { return c.label }),
+        rows: root.rowSummary(),
+        preview: root.preview ? { path: root.preview.path, state: root.preview.state, label: root.preview.label, reason: root.preview.reason } : null,
+        options: { query: root.optionsQuery, busy: root.optionsBusy, total: root.optionsTotal,
+          results: root.optionsResults.slice(0, 5).map(function(o) { return { path: o.path, current: o.current, hasCurrent: o.hasCurrent } }) } })
     }
   }
 }

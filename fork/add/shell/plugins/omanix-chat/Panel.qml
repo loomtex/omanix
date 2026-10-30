@@ -22,7 +22,7 @@ Item {
   property bool opened: false
 
   function open(payloadJson) { opened = true; Qt.callLater(focusComposer) }
-  function close() { opened = false }
+  function close() { opened = false; if (svc) svc.panelClosed() }
   function focusComposer() { composer.forceActiveFocus(); composer.cursorPosition = composer.text.length }
 
   // The service owns the composer text (a prefill can arrive while closed).
@@ -193,8 +193,40 @@ Item {
                 spacing: Style.space(6)
                 Text { textFormat: Text.PlainText; text: row.kind === "card" ? "⛉ " + row.text : (row.kind === "applied" ? "✓ " + row.text : ""); color: root.fg; font.pixelSize: Style.font.body }
                 ChatButton { visible: row.kind === "card"; text: "Show card"; onClicked: Quickshell.execDetached(["omarchy-shell", "omanix.approval", "open"]) }
-                ChatButton { visible: row.kind === "applied"; text: "Undo"; onClicked: Quickshell.execDetached(["loom", "undo"]) }
+                ChatButton { visible: row.kind === "applied"; text: "Undo"; onClicked: if (root.svc) root.svc.undoLast() }
                 ChatButton { visible: row.kind === "rolledback"; text: "Why?"; onClicked: if (root.svc) { root.svc.composerText = "Why was my last change rolled back?"; root.focusComposer() } }
+              }
+              // An agent-requested preview (§h.6): the helper's rendering of
+              // the change, never the agent's words.
+              Column {
+                visible: row.kind === "preview"
+                width: parent.width
+                spacing: Style.space(4)
+                readonly property bool current: !!root.svc && !!root.svc.preview && root.svc.preview.id === row.extra.id
+                Text {
+                  width: parent.width
+                  wrapMode: Text.Wrap
+                  textFormat: Text.PlainText
+                  color: row.detail === "refused" || row.detail === "failed" ? Commons.Color.urgent : root.fg
+                  font.pixelSize: Style.font.body
+                  text: ({ checking: "Checking a preview " + root.agentName + " asked for…",
+                    asked: root.agentName + " wants to preview: " + row.text,
+                    applying: "Previewing " + row.text + "…",
+                    previewing: "Previewing " + row.text + ". Keep it?",
+                    kept: "Kept: " + row.text + " (for now; Make it stick to keep it for good)",
+                    reverted: "Reverted: " + row.text,
+                    declined: "Not previewed: " + row.text,
+                    refused: "Refused a preview " + root.agentName + " asked for: " + row.text,
+                    failed: "The preview failed: " + row.text })[row.detail] || row.text
+                }
+                Row {
+                  spacing: Style.space(6)
+                  visible: parent.current && (row.detail === "asked" || row.detail === "previewing")
+                  ChatButton { visible: row.detail === "asked"; text: "Allow"; primary: true; onClicked: root.svc.previewAnswer("allow") }
+                  ChatButton { visible: row.detail === "asked"; text: "Not now"; onClicked: root.svc.previewAnswer("notnow") }
+                  ChatButton { visible: row.detail === "previewing"; text: "Keep"; primary: true; onClicked: root.svc.previewAnswer("keep") }
+                  ChatButton { visible: row.detail === "previewing"; text: "Revert"; onClicked: root.svc.previewAnswer("revert") }
+                }
               }
               Column {
                 visible: row.kind === "question"
@@ -255,16 +287,14 @@ Item {
           }
         }
 
-        Column {
+        OptionsBrowser {
           anchors.fill: parent
           visible: !!root.svc && root.svc.view === "options"
-          spacing: Style.space(8)
-          Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: root.fg; font.pixelSize: Style.font.title; font.bold: true; text: "What can I change?" }
-          Text { width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: root.fg; font.pixelSize: Style.font.body
-            text: "Look, apps, input, displays, power, network, security and updates are all yours to change: ask " + root.agentName
-              + ", or browse the options (omanix options <words> in a terminal)." }
-          ChatButton { text: "Ask " + root.agentName + ": what can I change?"; visible: root.chatState !== "none"
-            onClicked: if (root.svc) { root.svc.view = "chat"; root.svc.composerText = "What can I change on this computer?"; root.focusComposer() } }
+          svc: root.svc
+          fg: root.fg
+          agentName: root.agentName
+          canAsk: root.chatState !== "none"
+          onAsked: Qt.callLater(root.focusComposer)
         }
 
         Column {

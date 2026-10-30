@@ -59,7 +59,9 @@ let
     export PATH=${bin}:/run/wrappers/bin:/etc/profiles/per-user/$USER/bin:/run/current-system/sw/bin:$PATH
     state="''${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current"
     if [ "$(cat "$state/theme.name" 2>/dev/null)" != ${lib.escapeShellArg cfg.theme.default} ]; then
+      # before Hyprland starts: its reload retint fails (runtime.nix)
       OMARCHY_THEME_WAIT=1 omarchy-theme-set ${lib.escapeShellArg cfg.theme.default} </dev/null \
+        2> >(grep -vx 'Theme retint failed: omarchy-restart-hyprctl' >&2) \
         || echo "omanix: could not re-apply the locked theme" >&2
     fi
     ${lib.optionalString (bg != null) ''

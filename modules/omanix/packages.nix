@@ -9,6 +9,16 @@
 
 let
   cfg = config.omanix;
+
+  # gsettings (Arch's glib2), with the GNOME desktop schemas and the dconf
+  # backend omarchy-theme-set-gnome and omarchy-display-text-size write
+  # through (org.gnome.desktop.interface); nixpkgs keeps schemas out of
+  # XDG_DATA_DIRS, and a user unit may lack the session's GIO_EXTRA_MODULES.
+  gsettings = pkgs.writeShellScriptBin "gsettings" ''
+    export XDG_DATA_DIRS=${pkgs.glib.getSchemaDataDirPath pkgs.gsettings-desktop-schemas}''${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}
+    export GIO_EXTRA_MODULES=${pkgs.dconf.lib}/lib/gio/modules''${GIO_EXTRA_MODULES:+:$GIO_EXTRA_MODULES}
+    exec ${pkgs.glib.bin}/bin/gsettings "$@"
+  '';
 in
 {
   options.omanix.packages.base = lib.mkOption {
@@ -39,7 +49,8 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    environment.systemPackages = cfg.packages.base;
+    environment.systemPackages = cfg.packages.base ++ [ gsettings ];
+    programs.dconf.enable = lib.mkDefault true;                   # gsettings' backend
 
     # What those tools need from the system.
     services.gnome.gnome-keyring.enable = lib.mkDefault true;   # libsecret, chromium's password store

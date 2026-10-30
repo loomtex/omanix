@@ -60,7 +60,10 @@ let
       mkdir -p "$HOME/.local/state/omarchy/toggles"
       touch "$HOME/.local/state/omarchy/toggles/background-intros-off"
     ''}
+    # Hyprland isn't running yet (it reads the theme when it starts), so
+    # theme-set's `hyprctl reload` retint fails; only that report is dropped.
     OMARCHY_THEME_WAIT=1 PATH="$themePath" omarchy-theme-set ${lib.escapeShellArg cfg.theme.default} </dev/null \
+      2> >(grep -vx 'Theme retint failed: omarchy-restart-hyprctl' >&2) \
       || echo "omanix: the first-login theme did not apply" >&2
     ${lib.optionalString (cfg.theme.background != null) ''
       PATH="$themePath" omarchy-theme-bg-set ${lib.escapeShellArg "${cfg.theme.background}"} || true
@@ -165,7 +168,10 @@ in
 
     systemd.user.services.omanix-session-state = {
       description = "omanix: write the typed runtime summary for the resident";
-      unitConfig.ConditionUser = user;
+      # A theme switch writes dozens of files under the watched paths in a
+      # burst; the default start limit (5 in 10 s) would fail the unit and,
+      # with it, the path unit.
+      unitConfig = { ConditionUser = user; StartLimitIntervalSec = 0; };
       environment = sessionEnv;
       serviceConfig = {
         Type = "oneshot";

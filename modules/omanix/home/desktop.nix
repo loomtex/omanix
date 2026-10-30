@@ -1,7 +1,7 @@
 # The rest of the desktop's HM files (§f.4.2): bash, git, GTK 4, btop's theme
 # link, and upstream's files that have no overlay. Fonts, input, XCompose,
-# defaults and chromium flags are W17's (fonts.nix, input.nix, defaults.nix,
-# apps); themes are W16's.
+# and defaults are W17's (fonts.nix, input.nix, defaults.nix, apps); themes
+# and the chromium flags are W16's (theme/, apps/chromium.nix).
 { config, lib, pkgs, ... }:
 
 let

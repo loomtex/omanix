@@ -15,12 +15,15 @@
         a copy of the binary cache SRC with every narinfo signed by the nix
         key K (omanix-cache-1; the release skill decrypts it through an
         approval, D11), then `nix store verify` against its public key
-  omanix-release build --repo R --tag T --out DIR --cache-key-file K --sign-key S
+  omanix-release build --repo R --tag T --out DIR
+                       (--cache-key-file K | --signed-cache C) [--sign-key S]
         the release: verify tag T (SSH-signed by a signer in the tagged tree's
-        release/allowed_signers), build the unsigned stick cache from the tag,
-        sign it, build the offline and net images from the tag with the signed
-        cache, write stick-index.txt, cache-key.pub, release.json and
-        SHA256SUMS, sign SHA256SUMS with S, and verify the result.
+        release/allowed_signers), build the unsigned stick cache from the tag
+        and sign it with K (or take C, signed by sign-cache beforehand), build
+        the offline and net images from the tag with the signed cache, write
+        stick-index.txt, cache-key.pub, release.json and SHA256SUMS, then sign
+        SHA256SUMS with S and verify. Without S it stops before signing: the
+        real signer is Josh's YubiKey, which only Josh's session can use.
 
 Nothing here holds a key: keys are files or agent identities passed in, and
 the dry run (docs in .claude/skills/release) passes throwaway ones.
@@ -175,6 +178,8 @@ def sign_cache(src, out, key_file):
         capture_output=True)
     run(["nix", "store", "verify", "--store", f"file://{os.path.abspath(out)}", "--all", "--no-contents",
          "--sigs-needed", "1", "--option", "trusted-public-keys", pub], capture_output=True)
+    with open(os.path.join(out, "cache-key.pub"), "w") as f:
+        f.write(pub + "\n")
     return pub
 
 
@@ -217,14 +222,25 @@ def build(a):
     log = lambda m: print(f"omanix-release: {m}", file=sys.stderr, flush=True)
 
     log(f"{a.tag} = {commit} (tag verified)")
-    log("building the unsigned stick cache from the tag")
-    unsigned = nix_build(f"({flake}).packages.{SYSTEM}.base-cache")
-    signed_dir = os.path.join(work, "cache")
-    log(f"signing the cache with {a.cache_key_file}")
-    pub = sign_cache(unsigned, signed_dir, a.cache_key_file)
-    signed = run(["nix", "store", "add", "--mode", "nar", "--name", f"omanix-{version}-cache", signed_dir],
+    if a.signed_cache:
+        signed_src = os.path.abspath(a.signed_cache)
+        pub = open(os.path.join(signed_src, "cache-key.pub")).read().strip() if os.path.exists(
+            os.path.join(signed_src, "cache-key.pub")) else a.cache_public_key
+        if not pub:
+            raise ReleaseError("--signed-cache needs its cache-key.pub (sign-cache writes it) or --cache-public-key")
+        run(["nix", "store", "verify", "--store", f"file://{signed_src}", "--all", "--no-contents",
+             "--sigs-needed", "1", "--option", "trusted-public-keys", pub], capture_output=True)
+        log(f"using the signed cache {signed_src} ({pub.split(':')[0]})")
+    else:
+        log("building the unsigned stick cache from the tag")
+        unsigned = nix_build(f"({flake}).packages.{SYSTEM}.base-cache")
+        signed_src = os.path.join(work, "cache")
+        log(f"signing the cache with {a.cache_key_file}")
+        pub = sign_cache(unsigned, signed_src, a.cache_key_file)
+    signed = run(["nix", "store", "add", "--mode", "nar", "--name", f"omanix-{version}-cache", signed_src],
                  capture_output=True).stdout.strip()
-    shutil.rmtree(signed_dir)
+    if not a.signed_cache:
+        shutil.rmtree(signed_src)
     images = {}
     for variant in a.variants.split(","):
         log(f"building the {variant} image (cacheDir = {signed})")
@@ -247,7 +263,12 @@ def build(a):
                    "dryRun": bool(a.dry_run)}, f, indent=2)
         f.write("\n")
     write_sums(a.out)
-    log(f"signing SHA256SUMS with {a.sign_key} (a YubiKey asks for a touch)")
+    if not a.sign_key:
+        log("SHA256SUMS written, NOT signed. The release signer runs, with the YubiKey attached:")
+        log(f"  ssh-keygen -Y sign -n {NAMESPACE} -f <signing key> {os.path.join(os.path.abspath(a.out), SUMS)}")
+        log(f"then: omanix-release verify {a.out} --signers <tagged tree>/release/allowed_signers")
+        return {"ok": True, "signed": False, "out": a.out, "version": version, "tag": a.tag, "commit": commit}
+    log(f"signing SHA256SUMS with {a.sign_key}")
     sign(os.path.join(a.out, SUMS), a.sign_key)
     res = verify(a.out, signers)
     log(f"verified: signed by {res['signer']}")
@@ -276,8 +297,12 @@ def main(argv=None):
     p.add_argument("--repo", required=True)
     p.add_argument("--tag", required=True)
     p.add_argument("--out", required=True)
-    p.add_argument("--cache-key-file", required=True, help="the omanix-cache-1 nix secret key (a test key in a dry run)")
-    p.add_argument("--sign-key", required=True, help="SSH signing key for SHA256SUMS (YubiKey; a test key in a dry run)")
+    g = p.add_mutually_exclusive_group(required=True)
+    g.add_argument("--cache-key-file", help="the omanix-cache-1 nix secret key (a test key in a dry run)")
+    g.add_argument("--signed-cache", help="a cache sign-cache already signed (the real run: signed through an approval)")
+    p.add_argument("--cache-public-key", help="with --signed-cache, if it has no cache-key.pub")
+    p.add_argument("--sign-key", help="SSH signing key for SHA256SUMS (a test key in a dry run); without it, "
+                   "SHA256SUMS is left for the release signer's YubiKey")
     p.add_argument("--variants", default="offline,net")
     p.add_argument("--work")
     p.add_argument("--dry-run", action="store_true", help="recorded in release.json; nothing is published either way")

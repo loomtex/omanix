@@ -57,7 +57,8 @@
         "description": "Propose the committed working copy: pushes gate/<topic> and asks for the switch with `loom propose`; the human approves on a card. Waits for the decision unless --no-wait (exit 3: card waiting).",
         "args": [{"name": "--request", "help": "the human's words, verbatim (shown on the card)"},
                  {"name": "--no-wait", "action": "store_true", "help": "return once the card is up (exit 3)"},
-                 {"name": "--ref", "default": "HEAD", "help": "commit to propose"}],
+                 {"name": "--ref", "default": "HEAD", "help": "commit to propose"},
+                 {"name": "--out", "help": "an already built toplevel of that commit (skips the build; loom propose --out)"}],
         "output": {"required": ["tip", "request", "result"], "properties": {"result": {"enum": ["applied", "denied", "rolled-back", "refused", "waiting", "failed"]}}}
       },
       "update": {

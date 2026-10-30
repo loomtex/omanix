@@ -42,8 +42,11 @@ def split_options(nixos: dict, home: dict, shared: list[str]):
     for scope, src, dst in (("nixos", nixos, out_n), ("home", home, out_h)):
         for name, o in src.items():
             o = {k: v for k, v in o.items() if k not in ("loc",)}
-            if scope == "home" and name.startswith("<name>."):
-                name = name[len("<name>."):]
+            if scope == "home":
+                if name.startswith("<name>."):
+                    name = name[len("<name>."):]
+                elif name.startswith("home-manager.users."):
+                    name = name.split(".", 3)[3]
             if is_shared(o):
                 dst[name] = o
             else:

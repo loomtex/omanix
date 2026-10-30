@@ -47,14 +47,29 @@ let
         else let r = builtins.head (lib.splitString "." opt.name); in
           if builtins.elem r [ "omanix" "loom" "nuketown" ] then r else "nixpkgs";
     };
-  doc = opts: (pkgs.nixosOptionsDoc {
-    options = opts;
-    transformOptions = transform;
-    warningsAreErrors = false;
-  }).optionsJSON + "/share/doc/nixos/options.json";
+  # nixosOptionsDoc's own list (lib.optionAttrSetToDocList), written as its
+  # JSON, except that a default or example that fails to render (an unfree
+  # package the host doesn't allow, say) becomes "<not rendered>" instead of
+  # failing the host's build.
+  safe = v: let r = builtins.tryEval (builtins.deepSeq v v); in if r.success then r.value else { _type = "literalExpression"; text = "<not rendered>"; };
+  doc = opts:
+    let
+      entries = lib.filter (o: o.visible && !o.internal) (lib.optionAttrSetToDocList opts);
+      entry = o: let t = transform o; in {
+        name = t.name;
+        value = removeAttrs t [ "name" "visible" "internal" "loc" "relatedPackages" ]
+          // lib.optionalAttrs (t ? default) { default = safe t.default; }
+          // lib.optionalAttrs (t ? example) { example = safe t.example; }
+          // { description = let d = t.description or ""; in if builtins.isAttrs d then d.text or "" else if d == null then "" else d; };
+      };
+    in
+    pkgs.writeText "options.json" (builtins.unsafeDiscardStringContext (builtins.toJSON (lib.listToAttrs (map entry entries))));
 
   nixosOptions = options // { home-manager = removeAttrs options.home-manager [ "users" ]; };
-  homeOptions = options.home-manager.users.type.getSubOptions [ ];
+  # The human's own HM options (defaults render against a real home.stateVersion).
+  homeOptions = removeAttrs
+    (options.home-manager.users.valueMeta.attrs.${user}.configuration.options or (options.home-manager.users.type.getSubOptions [ ]))
+    [ "_module" ];
 
   # ---- effective config ------------------------------------------------------
   san = depth: v:
@@ -277,6 +292,10 @@ in
   };
 
   config = lib.mkIf (cfg.enable && cfg.catalog.enable) {
+    # U40: the catalogs render every option's default, and nuketown's name
+    # pkgs.unstable; loom adds this alias only on hosts with an agent.
+    nixpkgs.overlays = [ (final: prev: { unstable = prev.unstable or final; }) ];
+
     # The catalog belongs to the generation: $out/catalog in the toplevel.
     # sw/share/omanix/catalog (next to home/default.nix's packages.txt) is a
     # fixed link to the running one, so a new catalog (every commit changes

@@ -362,7 +362,28 @@ Item {
 
   // Undo the last change: `loom undo` as the human (polkit farm.loom.undo in
   // the active session), which raises the routine "Undo: …" card.
-  function undoLast() { Quickshell.execDetached(["loom", "undo"]) }
+  // A refusal (nothing to undo, the old system was collected) is an error
+  // row with loom's own words, not silence.
+  function undoLast() { undoComponent.createObject(root, {}) }
+
+  Component {
+    id: undoComponent
+    Process {
+      running: true
+      command: ["bash", "-c", "out=$(loom undo 2>&1 </dev/null); rc=$?; printf '%s\\n%s' \"$rc\" \"$out\""]
+      stdout: StdioCollector {
+        waitForEnd: true
+        onStreamFinished: {
+          var out = String(text || "")
+          var nl = out.indexOf("\n")
+          var rc = parseInt(nl < 0 ? out : out.slice(0, nl))
+          var msg = (nl < 0 ? "" : out.slice(nl + 1)).trim().split("\n").filter(function(l) { return l.trim() !== "" }).pop() || ""
+          if (rc !== 0) root.add("error", "Undo didn't go through: " + (msg || "loom undo exited " + rc))
+        }
+      }
+      onExited: destroy()
+    }
+  }
 
   // The panel closed: a preview nobody kept goes back.
   function panelClosed() {

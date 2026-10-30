@@ -64,6 +64,7 @@ in
       maxBytes = agent.chat.attachments.maxBytes or 8388608;
     };
     environment.etc."omanix/chips/rules.json".source = ../../data/chips/rules.json;
-    environment.systemPackages = [ facts ];
+    # file: the attachment preview's MIME check (snapshots, files, screenshots)
+    environment.systemPackages = [ facts pkgs.file ];
   };
 }

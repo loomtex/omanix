@@ -163,4 +163,8 @@
     option = "i18n.inputMethod.fcitx5.addons";
     reason = "a list that only appends: upstream's input-method engines";
   }
+  {
+    option = "loom.agent.promptFragments";
+    reason = "a list that only appends: omanix's guidance and option index next to whatever the host adds (§h.10)";
+  }
 ]

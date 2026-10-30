@@ -16,6 +16,8 @@ in
     ./apps
     ./audio.nix
     ./branding.nix
+    ./catalog.nix
+    ./cli.nix
     ./chat.nix
     ./defaults.nix
     ./dns.nix

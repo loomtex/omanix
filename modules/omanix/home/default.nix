@@ -1,6 +1,6 @@
 # omanix.home: the human's dotfiles (D9: home-manager, read-only store links;
 # §f.4.2). Each owning module writes its targets with HM and registers them
-# in omanix.home.files, which is exported to catalog/home.json and checked
+# in omanix.home.files, which catalog.nix exports to catalog/home.json; checked
 # (checks.home-files-golden: the overlay is each file's last directive).
 { config, lib, pkgs, ... }:
 
@@ -28,21 +28,6 @@ let
     };
   });
 
-  # What the fork's scripts and the menu's install guards read (P6, W3).
-  catalogConfig = {
-    omanix = {
-      defaults = {
-        browser = cfg.defaults.browser or "chromium";
-        terminal = cfg.defaults.terminal or "alacritty";
-        editor = cfg.defaults.editor or "nvim";
-        dictation = cfg.defaults.dictation or "voxtype";
-        agent = if config.loom.agent.enable then config.loom.agent.name else null;
-      };
-      dns.provider = cfg.dns.provider or "dhcp";
-      release.channel = "stable";
-    };
-  };
-  homeCatalog = lib.mapAttrs (_: f: { inherit (f) module overlay; }) cfg.home.files;
 in
 {
   imports = [ ./desktop.nix ./terminals.nix ];
@@ -77,15 +62,9 @@ in
     # Written into system-path itself (extraSetup), so reading systemPackages
     # here is not a recursion.
     environment.extraSetup = ''
-      mkdir -p $out/share/omanix/catalog
+      mkdir -p $out/share/omanix
       cat > $out/share/omanix/packages.txt <<'EOF'
       ${lib.concatStringsSep "\n" (lib.unique (map lib.getName config.environment.systemPackages))}
-      EOF
-      cat > $out/share/omanix/catalog/config.json <<'EOF'
-      ${builtins.toJSON catalogConfig}
-      EOF
-      cat > $out/share/omanix/catalog/home.json <<'EOF'
-      ${builtins.toJSON homeCatalog}
       EOF
     '';
 

@@ -21,20 +21,44 @@ pkgs.testers.runNixOSTest {
   node.pkgsReadOnly = false;
   node.specialArgs = { inputs = { }; inherit loom omanix; };
 
-  nodes.machine = { config, pkgs, lib, ... }:
-    let
-      splash = t: pkgs.omanix-plymouth.override { omanixTheme = t; themeName = "omanix-${t}"; };
-      greeter = t: pkgs.omanix-sddm-theme.override { omanixTheme = t; themeName = "omanix-${t}"; };
-    in
-    {
-      imports = [ (d.node { greeter = true; }) ];
-      boot.plymouth.themePackages = lib.mkForce ([ config.omanix.theme.boot.plymouth ] ++ map splash goldenThemes);
-      environment.systemPackages = map greeter goldenThemes;
+  # The greeter node is the omanix desktop through SDDM; each Plymouth node
+  # is a minimal system whose systemd initrd shows the theme's unlock
+  # prompt (a password request, as for the disk) and waits there.
+  nodes = {
+    machine = { config, pkgs, lib, ... }:
+      let greeter = t: pkgs.omanix-sddm-theme.override { omanixTheme = t; themeName = "omanix-${t}"; };
+      in {
+        imports = [ (d.node { greeter = true; }) ];
+        environment.systemPackages = map greeter goldenThemes;
+      };
+  } // lib.listToAttrs (map (t: lib.nameValuePair "plymouth_${lib.replaceStrings [ "-" ] [ "_" ] t}" ({ config, pkgs, lib, ... }: {
+    nixpkgs.overlays = [ omanix.overlays.default ];
+    boot.plymouth = {
+      enable = true;
+      themePackages = [ (pkgs.omanix-plymouth.override { omanixTheme = t; }) ];
+      theme = "omanix";
     };
+    boot.initrd.systemd.services.omanix-unlock-prompt = {
+      description = "Ask for a password (the unlock screen)";
+      wantedBy = [ "initrd.target" ];
+      after = [ "plymouth-start.service" ];
+      before = [ "initrd-root-fs.target" ];
+      unitConfig.DefaultDependencies = false;
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${config.boot.initrd.systemd.package}/bin/systemd-ask-password --timeout=0 Unlock";
+        StandardOutput = "null";
+      };
+    };
+    boot.initrd.systemd.storePaths = [ "${config.boot.initrd.systemd.package}/bin/systemd-ask-password" ];
+    # Plymouth's DRM renderer never shows on virtio-gpu's QMP screendump
+    # (no flip or dirty-FB); QEMU's standard VGA (bochs-drm) does.
+    virtualisation.qemu.options = [ "-vga std" ];
+  })) goldenThemes);
 
   testScript = ''
     ${d.helpers}
-    import os, subprocess
+    import os, subprocess, time
     THEMES = ${builtins.toJSON goldenThemes}
     PAL = json.loads(${builtins.toJSON (builtins.toJSON palettes)})
     GOLDEN = "${goldens}"
@@ -48,25 +72,26 @@ pkgs.testers.runNixOSTest {
     def near(a, b, tol=12):
         return all(abs(int(a[i:i+2], 16) - int(b[i:i+2], 16)) <= tol for i in (1, 3, 5))
 
-    def shot_ok(t, name):
-        machine.screenshot(name)
+    def shot_ok(t, name, node):
+        node.screenshot(name)
         shot = os.path.join(OUT, name + ".png")
         corner = "#" + magick(shot, "-format", "%[hex:p{4,4}]", "info:")[:6].lower()
         acc = float(magick(shot, "-fuzz", "8%", "-fill", "white", "-opaque", PAL[t]["accent"], "-fill", "black", "+opaque", "white", "-format", "%[fx:mean]", "info:"))
         print(f"{name}: corner {corner} (background {PAL[t]['background']}), accent coverage {acc:.4f}")
         return shot, near(corner, PAL[t]["background"]) and acc > 0.005
 
-    def check(t, what, diag=None):
+    def check(t, what, diag=None, node=None):
+        node = node or machine
         name = f"{t}-{what}"
         # retry: the VM's scanout can lag a mode set by a few seconds
         for attempt in range(6):
-            shot, ok = shot_ok(t, name)
+            shot, ok = shot_ok(t, name, node)
             if ok:
                 break
-            machine.sleep(2)
+            time.sleep(2)
         if not ok:
             if diag:
-                print(machine.execute(diag)[1])
+                print(node.execute(diag)[1])
             raise AssertionError(f"{name}: the theme's background and accent logo are not on screen")
         golden = os.path.join(GOLDEN, name + ".png")
         if os.path.exists(golden):
@@ -86,19 +111,21 @@ pkgs.testers.runNixOSTest {
 
     for t in THEMES:
         with subtest(f"Plymouth: the {t} unlock screen"):
-            machine.succeed("rm -f /etc/plymouth/plymouthd.conf && "
-                            f"printf '[Daemon]\\nTheme=omanix-{t}\\nShowDelay=0\\nDeviceTimeout=8\\n' > /etc/plymouth/plymouthd.conf")
-            machine.succeed("chvt 1")
-            machine.succeed("plymouthd --mode=boot --tty=/dev/tty1 --pid-file=/run/omanix-plymouthd.pid --debug --debug-file=/tmp/plymouthd.log")
-            machine.succeed("plymouth --ping")
-            machine.succeed("plymouth show-splash")
-            machine.execute("plymouth ask-for-password --prompt=Unlock >/dev/null 2>&1 &")
-            machine.sleep(3)
-            machine.send_chars("omanix")
-            machine.sleep(2)
-            check(t, "plymouth", diag="tail -n 80 /tmp/plymouthd.log; ls -la /dev/dri; cat /proc/fb")
-            machine.execute("plymouth quit; sleep 1; pkill plymouthd; pkill -f 'plymouth ask-for-password'")
-            machine.sleep(2)
+            node = globals()["plymouth_" + t.replace("-", "_")]
+            node.start()
+            # no backdoor yet (the initrd is waiting): watch the screen
+            for _ in range(60):
+                time.sleep(2)
+                node.screenshot("probe")
+                c = "#" + magick(os.path.join(OUT, "probe.png"), "-format", "%[hex:p{4,4}]", "info:")[:6].lower()
+                if near(c, PAL[t]["background"]):
+                    break
+            time.sleep(3)
+            node.send_chars("omanix")
+            time.sleep(2)
+            check(t, "plymouth", node=node)
+            node.crash()
+    os.remove(os.path.join(OUT, "probe.png"))
 
     for t in THEMES:
         with subtest(f"SDDM: the {t} greeter"):

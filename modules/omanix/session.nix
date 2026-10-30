@@ -58,7 +58,10 @@ in
     };
 
     systemd.packages = [ units ];
-    systemd.user.services = lib.mapAttrs (_: target: { wantedBy = [ target ]; }) firstRunUnits;
+    # Only wantedBy: NixOS's default unit PATH (coreutils … systemd) would
+    # shadow the session PATH uwsm imports, and upstream's scripts call the
+    # system profile by name (omarchy-system-sleep-monitor: dbus-monitor).
+    systemd.user.services = lib.mapAttrs (_: target: { wantedBy = [ target ]; enableDefaultPath = false; }) firstRunUnits;
 
     # What the session and the fork's scripts call by name.
     environment.systemPackages = with pkgs; [
@@ -68,6 +71,13 @@ in
       xdg-utils
       xdg-terminal-exec
       cfg.hyprland.package
+      # The shell's own (whatever omanix.packages.base keeps): inotifywait
+      # (plugin and input-device watches), dbus-monitor (the sleep lock), and
+      # python3 with gi (the input-method indicator; the same env as
+      # packages.base and input.nix, so one python3 on PATH).
+      inotify-tools
+      dbus
+      (python3.withPackages (p: [ p.pygobject3 ]))
     ];
 
     xdg.portal = {

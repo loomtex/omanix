@@ -9,11 +9,12 @@
 # /etc/omanix/settle.json: what `omanix-overlay settle` compares against
 #   ("make it stick"): the declared kv/typed values (omanix.runtime.settle,
 #   from fonts.nix and input.nix) and the absorbed whole-file snapshots. It
-#   runs at every login (session init) and after a promoted switch: loom's
-#   afterTest hook reloads Hyprland right after `switch-to-configuration
-#   test` and leaves a user unit that settles once the system profile points
-#   at the new generation (loom has no after-promote hook; a rollback never
-#   gets there, so nothing is settled against a rejected generation).
+#   runs at every login (session init) and after a promoted switch (loom's
+#   afterPromote hook, as the session: settle, then reload Hyprland so it
+#   drops what was settled). A rollback never runs afterPromote, so nothing
+#   is settled against a rejected generation. The afterTest hook only
+#   reloads Hyprland right after `switch-to-configuration test`, so the
+#   watchdog's configerrors check sees the new Lua (§f.2.9).
 { config, lib, pkgs, ... }:
 
 let
@@ -74,32 +75,20 @@ let
     fi
   '';
 
-  # loom.switch.afterTest (as = session), with @toplevel@ = the generation
-  # just activated (new, or the old one on rollback).
+  # loom.switch.afterTest (as = session): runs after every
+  # `switch-to-configuration test`, including a rollback's.
   afterTest = pkgs.writeShellScript "omanix-after-switch-test" ''
     set -u
-    top=$1
     ${hyprEnv}
-    # The watchdog's configerrors check must see the new Lua (§f.2.9).
     ${hyprctl} reload >/dev/null 2>&1 || true
-    case "$top" in /nix/store/*) ;; *) exit 0 ;; esac
-    ${pkgs.systemd}/bin/systemd-run --user --no-block --collect --quiet \
-      --unit="omanix-settle-$(basename "$top" | cut -c1-12)" \
-      ${settleWhenPromoted} "$top" >/dev/null 2>&1 || true
   '';
-  settleWhenPromoted = pkgs.writeShellScript "omanix-settle-when-promoted" ''
+  # loom.switch.afterPromote (as = session), with @toplevel@ = the promoted
+  # generation (now /run/current-system).
+  afterPromote = pkgs.writeShellScript "omanix-after-switch-promote" ''
     set -u
-    top=$1
-    for _ in $(seq 1 360); do
-      if [ "$(readlink -f /nix/var/nix/profiles/system)" = "$top" ]; then
-        [ "$(readlink -f /run/current-system)" = "$top" ] || exit 0
-        ${pkgs.omanix-overlay}/bin/omanix-overlay settle "$top/etc/omanix/settle.json"
-        ${hyprEnv}
-        exec ${hyprctl} reload
-      fi
-      [ "$(readlink -f /run/current-system)" = "$top" ] || exit 0   # rolled back
-      sleep 5
-    done
+    ${pkgs.omanix-overlay}/bin/omanix-overlay settle "$1/etc/omanix/settle.json" || true
+    ${hyprEnv}
+    ${hyprctl} reload >/dev/null 2>&1 || true
   '';
 in
 {
@@ -129,7 +118,8 @@ in
   config = lib.mkIf cfg.enable {
     environment.systemPackages = [ pkgs.omanix-overlay pkgs.omanix-runtime-snapshot ];
     environment.etc."omanix/settle.json".text = builtins.toJSON settle;
-    loom.switch.afterTest = [ { command = "${afterTest} @toplevel@"; as = "session"; } ];
+    loom.switch.afterTest = [ { command = "${afterTest}"; as = "session"; } ];
+    loom.switch.afterPromote = [ { command = "${afterPromote} @toplevel@"; as = "session"; } ];
 
     users.groups.omanix-resident = { };
     systemd.tmpfiles.rules = [

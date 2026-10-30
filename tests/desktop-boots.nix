@@ -91,6 +91,11 @@ pkgs.testers.runNixOSTest {
         machine.succeed("pgrep -u ${user} -f 'quickshell .*-p /run/current-system/omarchy/shell'")
         machine.screenshot("desktop")
 
+    with subtest("the shell and upstream's user units find their tools"):
+        # inotifywait, python3 (the shell), dbus-monitor (omarchy-sleep-lock)
+        machine.wait_until_succeeds("pgrep -u ${user} -x dbus-monitor", timeout=T(30))
+        machine.fail("journalctl -b _UID=${uid} | grep -E 'Process failed to start.*(inotifywait|python3)|dbus-monitor: not found'")
+
     with subtest("session init created the overlays; HM files are read-only links"):
         machine.wait_until_succeeds(${builtins.toJSON (asUser "systemctl --user is-active omanix-session-init.service")}, timeout=T(60))
         for f in ["hypr/monitors.lua", "alacritty.toml", "foot.ini", "fontconfig/fonts.conf"]:

@@ -157,7 +157,19 @@
   }
   {
     option = "loom.switch.afterTest";
-    reason = "a list that only appends: the Hyprland reload and the post-promotion settle (§f.4.6)";
+    reason = "a list that only appends: the Hyprland reload the watchdog's configerrors check needs (§f.2.9)";
+  }
+  {
+    option = "loom.switch.afterPromote";
+    reason = "a list that only appends: the post-promotion settle and reload (§f.4.6)";
+  }
+  {
+    option = "loom.nixpkgs.allowUnfree";
+    reason = "a list that only appends: the unfree packages an enabled quirk, app or default needs";
+  }
+  {
+    option = "loom.nixpkgs.permittedInsecure";
+    reason = "a list that only appends: broadcom-sta for the bcm43xx quirk";
   }
   {
     option = "i18n.inputMethod.fcitx5.addons";

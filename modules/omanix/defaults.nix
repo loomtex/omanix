@@ -25,7 +25,7 @@ let
     chromium = { package = pkgs.chromium; desktop = "chromium.desktop"; };   # apps/default.nix ships the alias upstream expects
     brave = { package = pkgs.brave; desktop = "brave-browser.desktop"; };
     firefox = { package = pkgs.firefox; desktop = "firefox.desktop"; };
-    chrome = { package = pkgs.google-chrome; desktop = "google-chrome.desktop"; };
+    chrome = { package = pkgs.google-chrome; desktop = "google-chrome.desktop"; unfree = true; };
   };
   editors = {
     nvim = pkgs.neovim;
@@ -54,13 +54,13 @@ in
       type = lib.types.enum (builtins.attrNames browsers);
       default = "chromium";
       example = "firefox";
-      description = "The default web browser (set in the app-owned mimeapps.list at activation when it differs). chrome is unfree.";
+      description = "The default web browser (set in the app-owned mimeapps.list at activation when it differs). chrome is unfree (choosing it allows it in loom.nixpkgs.allowUnfree).";
     };
     editor = lib.mkOption {
       type = lib.types.enum (builtins.attrNames editors);
       default = "nvim";
       example = "helix";
-      description = "The editor `omarchy-launch-editor` opens (nvim gets omarchy's LazyVim config at first login). code is unfree.";
+      description = "The editor `omarchy-launch-editor` opens (nvim gets omarchy's LazyVim config at first login). code is unfree (choosing it allows it in loom.nixpkgs.allowUnfree).";
     };
     dictation = lib.mkOption {
       type = lib.types.enum (builtins.attrNames dictation);
@@ -73,6 +73,9 @@ in
   config = lib.mkIf cfg.enable {
     environment.systemPackages = [ terminals.${dcfg.terminal}.package browser.package editors.${dcfg.editor} ]
       ++ lib.optional (dictation.${dcfg.dictation} != null) dictation.${dcfg.dictation};
+    # The unfree choices (chrome, code) allow themselves.
+    loom.nixpkgs.allowUnfree = lib.optional (browser.unfree or false) (lib.getName browser.package)
+      ++ lib.optional (dcfg.editor == "code") (lib.getName editors.code);
 
     home-manager.users.${user} = lib.mkIf cfg.home.enable ({ lib, ... }: {
       xdg.configFile."xdg-terminals.list".text = ''

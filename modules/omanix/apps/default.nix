@@ -72,7 +72,8 @@ let
     try = [ try-tobi ];
     asdcontrol = [ asdcontrol ];
   };
-  # Unfree upstream apps are off until the host allows them.
+  # Unfree upstream apps are off by default; enabling one allows its default
+  # packages (loom.nixpkgs.allowUnfree).
   unfree = with pkgs; { obsidian = [ obsidian ]; };
 
   enabled = lib.filterAttrs (n: a: n != "webapps" && n != "tuis" && a.enable) acfg;
@@ -220,7 +221,8 @@ in
       Applications by name: `{ enable; packages; autostart; }`. Upstream's base
       set (nautilus, evince, imv, mpv, libreoffice, pinta, localsend, docker,
       herdr, udiskie, omarchy's own apps, …) is on by default; obsidian is
-      unfree and off. Add your own with `packages` (and `autostart`).
+      unfree and off (enabling it adds it to loom.nixpkgs.allowUnfree). Add
+      your own with `packages` (and `autostart`).
     '';
   };
 
@@ -234,6 +236,8 @@ in
         };
 
       environment.systemPackages = appPackages ++ [ entries ];
+      loom.nixpkgs.allowUnfree = lib.concatLists (lib.mapAttrsToList
+        (n: ps: lib.optionals (acfg.${n}.enable or false) (map lib.getName ps)) unfree);
       omanix.keybinds.binds = binds;
 
       home-manager.users.${user} = lib.mkIf cfg.home.enable {

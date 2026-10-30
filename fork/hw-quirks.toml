@@ -85,7 +85,7 @@ source = ["install/hardware/intel/ipu7-camera.sh"]
 probe = { acpi_hid = "OVTI08F4" }
 status = "v1"
 unfree = true
-mechanism = "hardware.ipu7 (nixpkgs module; ipu7-camera-bins and ivsc-firmware are unfree, so the host allows them)"
+mechanism = "hardware.ipu7 (nixpkgs module; ipu7-camera-bins and ivsc-firmware are unfree; the quirk adds them to loom.nixpkgs.allowUnfree)"
 requires = ["option:hardware.ipu7.enable", "pkgs.ipu7-camera-bins"]
 
 [quirk.asus-rog]
@@ -177,7 +177,7 @@ source = ["install/hardware/fix-bcm43xx.sh"]
 probe = { pci = ["14e4:43a0", "14e4:4331"] }
 status = "v1"
 unfree = true
-mechanism = "broadcom_sta (wl), b43/bcma/ssb blacklisted; unfree and marked insecure in nixpkgs, so the host allows both"
+mechanism = "broadcom_sta (wl), b43/bcma/ssb blacklisted; unfree and marked insecure in nixpkgs; the quirk adds it to loom.nixpkgs.allowUnfree and permittedInsecure"
 requires = ["pkgs.linuxPackages.broadcom_sta"]
 
 [quirk.tuxedo-backlight]

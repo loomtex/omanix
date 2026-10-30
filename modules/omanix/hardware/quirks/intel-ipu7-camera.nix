@@ -18,5 +18,9 @@ in
 
   config = lib.mkIf (config.omanix.enable && q.enable) {
     hardware.ipu7 = { enable = lib.mkDefault true; platform = lib.mkDefault q.platform; };
+    # hardware.ipu7's firmware (Intel's ISSL licence). The compressed
+    # firmware copy has no pname, so ivsc-firmware's unstable version
+    # parses into its name.
+    loom.nixpkgs.allowUnfree = [ "ipu7-camera-bins" "ivsc-firmware" "ivsc-firmware-unstable" ];
   };
 }

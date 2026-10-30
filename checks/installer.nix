@@ -86,4 +86,7 @@ in
       ${lib.concatMapStringsSep " " (c: "--closure ${c.name}=${c}/store-paths") (lib.attrValues closures)} \
       --out $out
   '';
+} // lib.optionalAttrs (pkgs.stdenv.hostPlatform.system == "x86_64-linux") {
+  # §i.2: configure → flash → offline install → first boot, cacheMiss = [].
+  installer-e2e-omanix = import ../tests/installer-e2e-omanix.nix { inherit pkgs self inputs; };
 }

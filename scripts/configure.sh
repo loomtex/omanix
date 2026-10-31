@@ -57,8 +57,12 @@ omanix_verify() {
       || omanix_die "this checkout has uncommitted changes; check out a release tag (or OMANIX_DEV=1)"
     tag=$(git -C "$OMANIX_ROOT" describe --exact-match --tags HEAD 2>/dev/null) \
       || omanix_die "HEAD is not a release tag; check one out, e.g. git checkout v0.1.0 (or OMANIX_DEV=1)"
-    git -C "$OMANIX_ROOT" -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$OMANIX_SIGNERS" verify-tag "$tag" >/dev/null 2>&1 \
-      || omanix_die "tag $tag is not signed by a key in $OMANIX_SIGNERS"
+    # an SSH signature only: verify-tag would also accept a tag PGP-signed
+    # by any key in the user's gpg keyring
+    git -C "$OMANIX_ROOT" cat-file tag "$tag" 2>/dev/null | grep -q '^-----BEGIN SSH SIGNATURE-----$' \
+      || omanix_die "tag $tag has no SSH signature"
+    git -C "$OMANIX_ROOT" -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$OMANIX_SIGNERS" verify-tag --raw "$tag" 2>&1 \
+      | grep -q '^Good "git" signature for ' || omanix_die "tag $tag is not signed by a key in $OMANIX_SIGNERS"
   elif [[ -e $sums.sig ]]; then
     principal=$(ssh-keygen -Y find-principals -f "$OMANIX_SIGNERS" -s "$sums.sig" 2>/dev/null | head -n1) \
       || omanix_die "scripts/SHA256SUMS.sig is not by a key in $OMANIX_SIGNERS"

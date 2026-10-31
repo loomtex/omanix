@@ -197,6 +197,8 @@ def verify_tag(repo, tag):
     tmp.write(git(repo, "show", f"{commit}:release/allowed_signers") + "\n")
     tmp.close()
     signers_principals(tmp.name)
+    if "-----BEGIN SSH SIGNATURE-----" not in git(repo, "cat-file", "tag", tag, check=False):
+        raise ReleaseError(f"tag {tag} isn't signed by a key in release/allowed_signers at {commit[:12]}: no SSH signature")
     p = run(["git", "-C", repo, "-c", "gpg.format=ssh", "-c", f"gpg.ssh.allowedSignersFile={tmp.name}",
              "verify-tag", "--raw", tag], capture_output=True, check=False)
     if p.returncode != 0 or "Good \"git\" signature" not in (p.stderr + p.stdout):

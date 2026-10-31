@@ -375,7 +375,10 @@ Item {
     id: undoComponent
     Process {
       running: true
-      command: ["bash", "-c", "out=$(loom undo 2>&1 </dev/null); rc=$?; printf '%s\\n%s' \"$rc\" \"$out\""]
+      // In a transient user service, not under the shell: pkexec needs a
+      // process tree without no_new_privs, and polkit then sees the seat's
+      // session (U43).
+      command: ["bash", "-c", "out=$(systemd-run --user --wait --pipe --quiet --collect -- loom undo 2>&1 </dev/null); rc=$?; printf '%s\\n%s' \"$rc\" \"$out\""]
       stdout: StdioCollector {
         waitForEnd: true
         onStreamFinished: {

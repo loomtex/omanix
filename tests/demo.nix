@@ -242,6 +242,13 @@ pkgs.testers.runNixOSTest {
         print(f"propose {n}: {r['result']}")
         return r
 
+    def applied(n):
+        r = result(n)
+        if r["result"] != "applied":
+            print(sh(f"tail -n 5 {SW['recordsDir']}/*/result.json"))
+        assert r["result"] == "applied", r
+        return r
+
     def last_switch():
         d = SW["recordsDir"]
         n = max(int(x) for x in sh(f"ls {d}").split() if x.isdigit())
@@ -383,7 +390,7 @@ pkgs.testers.runNixOSTest {
             assert kc["request"] == "and hide the dock unless I hover", kc
             machine.screenshot("2-dock-card")
             click("banner.approve")
-            assert result("2b")["result"] == "applied"
+            applied("2b")
             assert jfile("/run/current-system/omarchy/config/omarchy/shell.json")["dock"]["autohide"] is True
             sh(f"git -C {MIRROR} log --format=%s -2 | grep -qx 'look: the dock hides until hover'")
             time.sleep(3)
@@ -429,7 +436,7 @@ pkgs.testers.runNixOSTest {
             st = jfile("/agents/ada/demo/3-set.json")
             assert st["action"] in ("rewritten", "replaced", "updated", "set") or st.get("file") == "configuration.nix", st
             click("banner.approve")
-            assert result("3")["result"] == "applied"
+            applied("3")
 
         with subtest("the commit is one line in configuration.nix; the chip is gone"):
             p = sh(f"git -C {MIRROR} log -1 -p --format=%s")
@@ -491,7 +498,7 @@ pkgs.testers.runNixOSTest {
             assert "bluetooth" not in diff.lower() and "services.tlp.enable = true;" in diff, diff
             machine.screenshot("4-routine-card")
             click("banner.approve")
-            assert result("4b")["result"] == "applied"
+            applied("4b")
             sh("systemctl is-active tlp.service")
             sh("! systemctl is-active power-profiles-daemon.service")
             until(lambda: abs(monitors()[0]["refreshRate"] - 60) < 1, "the screen runs at 60 Hz", 30)
@@ -557,7 +564,7 @@ pkgs.testers.runNixOSTest {
             card("banner", "routine")
             machine.screenshot("5-change-card")
             click("banner.approve")
-            assert result("5c")["result"] == "applied"
+            applied("5c")
             sh("grep -qx 'wifi.scan-rand-mac-address=false' /etc/NetworkManager/NetworkManager.conf")
             no_error_rows()
       '';
@@ -599,7 +606,7 @@ pkgs.testers.runNixOSTest {
             say("Yes, 60 Hz.")
             card("banner", "routine")
             click("banner.approve")
-            assert result("6b")["result"] == "applied"
+            applied("6b")
             until(lambda: abs(monitors()[0]["refreshRate"] - 60) < 1, "60 Hz", 30)
             n_applied, _, _ = last_switch()
             until(lambda: any(x["kind"] == "applied" for x in rows()), "the applied row (Undo)", 30)
@@ -728,7 +735,7 @@ pkgs.testers.runNixOSTest {
                 assert line in diff, (line, diff)
             machine.screenshot("stick-card")
             click("banner.approve")
-            assert result("stick")["result"] == "applied"
+            applied("stick")
 
         with subtest("settle: the absorbed monitors overlay is emptied, the kv keys are gone, the changed look overlay stays"):
             settle = jfile("/run/current-system/etc/omanix/settle.json")

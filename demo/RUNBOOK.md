@@ -35,6 +35,10 @@ Two kinds of run:
    nix build .#checks.x86_64-linux.vm-demo-{2,3,4,5,6,7} .#checks.x86_64-linux.{make-it-stick,human-commit} -L
    ```
 
+   (Until loom's `w21-loom` branch is merged and omanix re-locked, add
+   `--override-input loom git+file://<loom checkout>?ref=w21-loom`: the
+   preview relay, the human's pkexec path and the dead-man fix live there.)
+
    Each output has the screenshots of its run (`ls result*/`); they are the
    slides' stills and the B-roll for anything that fails live.
 3. For the live run: the release-candidate USB image (W20), flashed with
@@ -132,6 +136,23 @@ line in scene 4), say so and switch to the scripted VM for that scene.
 | Scene 8 reinstall time | |
 | What differed from the script | |
 | Recording files | |
+
+## Where the scripted run differs from DESIGN §j
+
+- Scene 6: the VM's virtio output accepts the monitor rule, so Hyprland
+  keeps answering; what breaks is the picture (the only output is disabled
+  and Hyprland draws to its headless fallback). omanix's display health
+  check catches that, and the panel says "Rolled back: Hyprland lost its
+  display within 30 s" rather than "Hyprland didn't answer".
+- Scene 5: power saving is already off in omanix's defaults, so the lasting
+  change the resident proposes is `scanRandMacAddress = false`.
+- Scene 7: `sudo -l -U ada` shows one rule (`nuketown-approve` as
+  `nuketown-approval`, design V8.1), not two wrappers.
+- Scene 4's module also persists `/var/lib/tlp` (the persist audit asks for
+  it), so the card's diff has one more line than the script in §j.
+- Each proposal switches to a prebuilt specialisation of the VM (see the
+  header of `demo/scenes.nix`); the commit, the card's git diff and the nvd
+  diff are real.
 
 ## If something goes wrong on stage
 

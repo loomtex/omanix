@@ -35,10 +35,6 @@ Two kinds of run:
    nix build .#checks.x86_64-linux.vm-demo-{2,3,4,5,6,7} .#checks.x86_64-linux.{make-it-stick,human-commit} -L
    ```
 
-   (Until loom's `w21-loom` branch is merged and omanix re-locked, add
-   `--override-input loom git+file://<loom checkout>?ref=w21-loom`: the
-   preview relay, the human's pkexec path and the dead-man fix live there.)
-
    Each output has the screenshots of its run (`ls result*/`); they are the
    slides' stills and the B-roll for anything that fails live.
 3. For the live run: the release-candidate USB image (W20), flashed with

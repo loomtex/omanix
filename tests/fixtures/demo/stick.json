@@ -1,9 +1,15 @@
 {
   "comment": "make-it-stick: the snapshot the GUI writes in the demo VM (tests/demo.nix prints the actual values when they differ)",
-  "monitors": [ { "output": "Virtual-1", "mode": "1280x800@74.994", "scale": 1.25 } ],
+  "monitors": [
+    {
+      "output": "Virtual-1",
+      "mode": "1280x800@74.99400",
+      "scale": 1.25
+    }
+  ],
   "gdkScale": 1,
   "fontSize": 12,
   "gapsOut": 4,
-  "monitorsSha": "unknown",
-  "lookSha": "unknown"
+  "monitorsSha": "7eff3dae4f3a976d1cc89d939d93f35e123ac4b0ad93d6181b2bb0472b89a794",
+  "lookSha": "7650b92f7d7086d8549e32426c5a75f961f0311dff2e211d999089fb958df99e"
 }

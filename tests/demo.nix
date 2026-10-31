@@ -93,7 +93,18 @@ pkgs.testers.runNixOSTest {
         { users.allowNoPasswordLogin = true; }
         (loom.outPath + "/tests/vm/disk-standin.nix")
         tripwire
-      ];
+      ] ++ lib.optional agentless {
+        # No resident. LOOM GAP (W21 report): loom configures nuketown, and so
+        # the approval path the human's `loom propose` needs, only while a
+        # resident or the reviewer is enabled; the reviewer stays on (it
+        # never reviews the human's own proposals) until loom fixes that.
+        loom.agent.enable = lib.mkForce false;
+        loom.reviewer.enable = true;
+        services.openssh.enable = true;
+      } ++ lib.optional withSilo {
+        loom.host.repo.fetchUrl = "ssh://git@silo/omanix/demo.git";
+        loom.host.repo.pushUrl = "ssh://git@silo/omanix/demo.git";
+      };
       networking.hostName = lib.mkForce "machine";
       users.users.${user}.password = "test";
       omanix.session.autologin = true;
@@ -128,17 +139,6 @@ pkgs.testers.runNixOSTest {
       virtualisation.diskSize = lib.mkForce 8192;
       virtualisation.writableStoreUseTmpfs = false;
       virtualisation.qemu.options = [ "-vga none" "-device virtio-gpu-pci" ];
-    } // lib.optionalAttrs agentless {
-      # No resident. LOOM GAP (W21 report): loom configures nuketown, and so
-      # the approval path the human's `loom propose` needs, only while a
-      # resident or the reviewer is enabled; the reviewer stays on (it
-      # never reviews the human's own proposals) until loom fixes that.
-      loom.agent.enable = lib.mkForce false;
-      loom.reviewer.enable = true;
-      services.openssh.enable = true;
-    } // lib.optionalAttrs withSilo {
-      loom.host.repo.fetchUrl = "ssh://git@silo/omanix/demo.git";
-      loom.host.repo.pushUrl = "ssh://git@silo/omanix/demo.git";
     };
   };
 
@@ -552,7 +552,7 @@ pkgs.testers.runNixOSTest {
             machine.screenshot("5-change-card")
             click("banner.approve")
             assert result("5c")["result"] == "applied"
-            sh("grep -q 'wifi.scan-rand-mac-address=no' /etc/NetworkManager/NetworkManager.conf")
+            sh("grep -qx 'wifi.scan-rand-mac-address=false' /etc/NetworkManager/NetworkManager.conf")
             no_error_rows()
       '';
 

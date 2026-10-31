@@ -49,9 +49,10 @@ in
     (lib.mkIf cfg.enable {
       environment.systemPackages = [ passwd ];
     })
-    # Only hosts with an agent have nuketown's home-manager options: the guard
-    # must sit outside the definition, or a host with no agent fails to eval.
-    (lib.mkIf (cfg.enable && cfg.approval.prompter && config.loom.agent.enable) {
+    # Only hosts where loom sets up nuketown (a resident or the reviewer) have
+    # its home-manager options: the guard must sit outside the definition, or
+    # a host without them fails to eval.
+    (lib.mkIf (cfg.enable && cfg.approval.prompter && (config.loom.agent.enable || config.loom.reviewer.enable)) {
       home-manager.users.${user}.nuketown.approvalDaemon.prompter =
         lib.mkDefault "${prompt}/bin/omanix-approval-prompt";
     })

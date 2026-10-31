@@ -266,7 +266,12 @@ Item {
 
   function previewAttachment(ref, kind, path) {
     previewComponent.createObject(root, { ref: ref, kind: kind, path: path,
-      command: ["bash", "-c", "f=$1; s=$(stat -c %s -- \"$f\") || exit 1; t=$(file -b --mime-type -- \"$f\"); printf '%s\\t%s\\n' \"$s\" \"$t\"; case $t in text/*|application/json) head -c 400 -- \"$f\";; esac", "preview", path] })
+      // the type from the name, text checked with grep -I (no file(1) on a
+      // default system)
+      command: ["bash", "-c", "f=$1; s=$(stat -c %s -- \"$f\") || exit 1; "
+        + "case ${f,,} in *.png) t=image/png;; *.jpg|*.jpeg) t=image/jpeg;; *.json) t=application/json;; "
+        + "*) if [ ! -s \"$f\" ] || grep -Iq . -- \"$f\"; then t=text/plain; else t=application/octet-stream; fi;; esac; "
+        + "printf '%s\\t%s\\n' \"$s\" \"$t\"; case $t in text/*|application/json) head -c 400 -- \"$f\";; esac", "preview", path] })
   }
 
   Component {

@@ -94,12 +94,17 @@ pkgs.testers.runNixOSTest {
         (loom.outPath + "/tests/vm/disk-standin.nix")
         tripwire
       ] ++ lib.optional agentless {
-        # No resident. LOOM GAP (W21 report): loom configures nuketown, and so
-        # the approval path the human's `loom propose` needs, only while a
-        # resident or the reviewer is enabled; the reviewer stays on (it
-        # never reviews the human's own proposals) until loom fixes that.
+        # No resident. LOOM GAP (W21 report): loom configures nuketown only
+        # while a resident or the reviewer is enabled, and nuketown's
+        # approval (nuketown-approve, the broker's socket directory) only
+        # while some agent has sudo. The human's `loom propose` needs it, so
+        # here the reviewer stays on and is a sudo agent that may request
+        # nothing (an empty allow list refuses every request before the
+        # human is asked). A host with no agent at all has no approval path
+        # until loom or nuketown provides one.
         loom.agent.enable = lib.mkForce false;
         loom.reviewer.enable = true;
+        nuketown.agents.reviewer.sudo = { enable = lib.mkForce true; approvalAllow = lib.mkForce [ ]; };
         services.openssh.enable = true;
       } ++ lib.optional withSilo {
         loom.host.repo.fetchUrl = "ssh://git@silo/omanix/demo.git";

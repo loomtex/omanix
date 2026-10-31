@@ -11,8 +11,7 @@
 #              the live system with the reference closures and the per-host
 #              build inputs in its store and NO substituter (offline). The
 #              driver answers the line-mode TUI; there is no answers file.
-#   target     the installed disk booted through OVMF, unlocked with the
-#              disk passphrase (see the first-boot subtest for why not the SEK)
+#   target     the installed disk booted through OVMF
 #
 # The piece from loom's tests/lib/installer-common.nix that this needs (the
 # silo node and the TUI helpers) is copied, not imported: that file exports
@@ -231,16 +230,11 @@ pkgs.testers.runNixOSTest {
           installer.wait_for_shutdown()
           assert "cache.nixos.org" not in ilog
 
-      with subtest("first boot: an omanix system, unlocked with the disk passphrase"):
-          # Not the SEK: on an omanix host Plymouth's password agent answers
-          # the prompt with the raw text before loom-askpass can turn a SEK
-          # into the key ("Failed to activate with specified passphrase"),
-          # found by this test's first run. loom's installer-e2e (no
-          # Plymouth) covers SEK unlock; the omanix case is a W16/loom issue.
+      with subtest("first boot: an omanix system, unlocked with the SEK"):
           target = boot_installed()
           target.start()
           target.wait_for_console_text("Please enter passphrase for disk", timeout=900)
-          target.send_console(DISKPW + "\n")
+          target.send_console(SEK + "\n")
           target.wait_for_unit("multi-user.target", timeout=900)
           target.succeed("test -e /run/current-system/omarchy")
           target.succeed("grep -q tokyo-night /persist/var/lib/loom/host/configuration.nix")

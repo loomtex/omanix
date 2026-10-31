@@ -171,7 +171,7 @@ pkgs.testers.runNixOSTest {
         return json.loads(ipc(target, "state"))
 
     def diag():
-        print(machine.execute("journalctl -b --no-pager -n 150 _UID=${uid} | grep -iv 'layershell screen'; "
+        print(machine.execute("set +e; journalctl -b --no-pager -n 150 _UID=${uid} | grep -iv 'layershell screen'; "
                               "journalctl -b --no-pager -n 60 -u 'loom-agent-bridge@*' -u 'loom-switch-*' -u nuketown-approval; "
                               "ls -la /agents/ada/demo 2>&1; tail -n 40 /agents/ada/demo/*.json 2>&1; "
                               "ps -eo pid,user,args | grep -E 'pkexec|loom|nuketown|polkit' | grep -v grep; "
@@ -778,12 +778,13 @@ pkgs.testers.runNixOSTest {
             try:
                 s = until(lambda: (lambda s: s if s["shown"] in ("card", "banner") else None)(state("omanix.approval")), "the card", 300)
             except AssertionError:
-                print(machine.execute("cat /tmp/human-propose.log; loginctl list-sessions; loginctl show-user ${user} -p Display; "
+                print(machine.execute("set +e; cat /tmp/human-propose.log; loginctl list-sessions; loginctl show-user ${user} -p Display; "
                                       "h=$(grep -o '/nix/store/[^\"]*loom-seat-active' /etc/polkit-1/rules.d/*.rules | head -n1); echo helper=$h; "
                                       "for s in 1 2; do runuser -u polkituser -- $h ${user} $s; echo \"seat-active $s: $?\"; done; "
                                       "ps -eo pid,user,args | grep -E 'pkexec|loom-switch|polkit' | grep -v grep; "
                                       "for p in $(pgrep -x pkexec); do pkcheck --action-id farm.loom.propose --process $p; echo pkcheck=$?; done; "
-                                      "journalctl -b --no-pager | grep -iE 'pkexec|polkit|loom-switch|nuketown-approve' | tail -n 30")[1])
+                                      "journalctl -b --no-pager -u polkit | tail -n 20; "
+                                      "journalctl -b --no-pager | grep -iE 'pkexec|loom-switch|nuketown-approve' | tail -n 30")[1])
                 raise
             time.sleep(2)
             d = request_dir()

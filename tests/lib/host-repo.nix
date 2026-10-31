@@ -16,7 +16,25 @@ rec {
       inner = builtins.fromJSON (builtins.readFile (omanix.outPath + "/flake.lock"));
       innerRoot = inner.nodes.${inner.root};
       rebase = inputs: lib.mapAttrs (_: v: if builtins.isList v then [ "omanix" ] ++ v else v) inputs;
-      embedded = lib.mapAttrs (_: node: node // lib.optionalAttrs (node ? inputs) { inputs = rebase node.inputs; })
+      # A node whose source isn't the one omanix's flake.lock names (an
+      # `--override-input`, say loom) is locked as a path to the source
+      # omanix actually evaluated with, so the VM has it.
+      actual =
+        let
+          walk = name: flake:
+            let node = inner.nodes.${name}; in
+            { ${name} = flake; } // lib.foldl' (acc: i:
+              let v = node.inputs.${i}; in
+              if builtins.isString v && flake ? inputs && flake.inputs ? ${i} then acc // walk v flake.inputs.${i} else acc)
+              { } (lib.attrNames (node.inputs or { }));
+        in removeAttrs (walk inner.root omanix) [ inner.root ];
+      # Only those: a path lock is hashed again by every eval, slowly over
+      # the VM's 9p store.
+      relock = name: node: node // lib.optionalAttrs (actual ? ${name} && actual.${name} ? narHash
+                                                     && actual.${name}.narHash != (node.locked.narHash or null)) {
+        locked = { type = "path"; path = actual.${name}.outPath; inherit (actual.${name}) narHash; };
+      };
+      embedded = lib.mapAttrs (name: node: relock name node // lib.optionalAttrs (node ? inputs) { inputs = rebase node.inputs; })
         (removeAttrs inner.nodes [ inner.root ]);
     in
     {

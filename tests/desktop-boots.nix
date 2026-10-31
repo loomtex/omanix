@@ -95,6 +95,10 @@ pkgs.testers.runNixOSTest {
         # inotifywait, python3 (the shell), dbus-monitor (omarchy-sleep-lock)
         machine.wait_until_succeeds("pgrep -u ${user} -x dbus-monitor", timeout=T(30))
         machine.fail("journalctl -b _UID=${uid} | grep -E 'Process failed to start.*(inotifywait|python3)|dbus-monitor: not found'")
+        # no shell helper lost its exec bit when omanix-data copied shell/
+        # (plugins/clipboard/capture.sh did, W21)
+        machine.fail("journalctl -b _UID=${uid} | grep -E 'Process failed to start'")
+        machine.succeed("test -x /run/current-system/omarchy/shell/plugins/clipboard/capture.sh")
 
     with subtest("session init created the overlays; HM files are read-only links"):
         machine.wait_until_succeeds(${builtins.toJSON (asUser "systemctl --user is-active omanix-session-init.service")}, timeout=T(60))

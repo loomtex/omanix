@@ -11,6 +11,10 @@
 #   try-preview     `omanix try` previews an allow-listed key in the human's
 #                   Hyprland session; `") io.popen(` and a path outside
 #                   catalog/preview.json are refused by the session helper.
+#                   From the resident, the request reaches the chat panel
+#                   through the bridge (W21): Allow / Not now, then Keep /
+#                   Revert; a forged request is refused by the panel. The
+#                   options browser searches the catalogs (W21).
 #   plugin-fixture  `omanix plugin add` of a local fixture flake: one nixpkgs
 #                   lock node (U29), the HM half evaluates through inputs
 #                   (U30), the persist audit asks for /var/lib/private/<svc>
@@ -317,10 +321,98 @@ in
                 assert d["error"], d
             machine.fail("test -e /tmp/pwned")
 
-        with subtest("the resident can't preview by itself: no Wayland, and the bridge relays only what loom allows"):
-            d = j(ada("omanix try omanix.hyprland.settings.general.gaps_out 4 --json"), want=5)
-            assert d["error"], d
+        import time   # only this variant sleeps
+        CHAT = "/run/current-system/omarchy/bin/omarchy-shell omanix.chat "
+        def chat(*args):
+            return machine.succeed("su - ${user} -c " + shlex.quote(HY + CHAT + " ".join(shlex.quote(a) for a in args))).strip()
+        def chat_state():
+            return json.loads(chat("state"))
+        def wait_preview(state, timeout=30):
+            for _ in range(timeout * 2):
+                p = chat_state()["preview"]
+                if p and p["state"] == state:
+                    return p
+                time.sleep(0.5)
+            raise AssertionError(f"preview never reached {state}: {chat_state()}")
+
+        with subtest("the chat panel is connected to the resident's bridge"):
+            machine.wait_for_unit("loom-agent-bridge@ada.service")
+            machine.wait_until_succeeds("su - ${user} -c " + shlex.quote(HY + CHAT + "state") + " | grep -q '\"connected\":true'", timeout=60)
+            chat("open")
+
+        with subtest("the resident asks for a preview: the panel shows the helper's rendering; Allow, then Revert"):
+            before_ = gaps()
+            d = j(ada("omanix try omanix.hyprland.settings.general.gaps_out 4 --json"))
+            assert d["delivered"] is True, d
+            p = wait_preview("asked")
+            assert p["label"] == "general.gaps_out → 4", p
+            assert gaps() == before_, "nothing is applied before Allow"
+            machine.sleep(1)
+            machine.screenshot("preview-asked")
+            assert chat("preview", "allow") == "ok"
+            wait_preview("previewing")
+            g = gaps()
+            assert g != before_ and "4" in json.dumps(g), g
+            machine.sleep(1)
+            machine.screenshot("preview-keep-revert")
+            assert chat("preview", "revert") == "ok"
+            wait_preview("reverted")
+            assert gaps() == before_, gaps()
+
+        with subtest("Keep leaves the preview as runtime state; the human's try --reset clears it"):
+            j(ada("omanix try omanix.hyprland.settings.general.gaps_out 9 --json"))
+            wait_preview("asked")
+            chat("preview", "allow")
+            wait_preview("previewing")
+            assert chat("preview", "keep") == "ok"
+            wait_preview("kept")
+            # the resident's reset doesn't undo what the human kept
+            j(ada("omanix try --reset --json"))
+            machine.sleep(2)
+            g = gaps()
+            assert g != before_ and "9" in json.dumps(g), g
+            j(human(HY + "omanix try --reset --json"))
+            assert gaps() == before_, gaps()
+
+        with subtest("a forged request on the control socket is checked again by the panel and refused"):
+            for path, value in [("omanix.hyprland.extraLua", 'io.popen("touch /tmp/pwned")'),
+                                ("omanix.hyprland.settings.general.gaps_out", '4") io.popen("touch /tmp/pwned'),
+                                ("omanix.hyprland.settings.general.layout", "nope")]:
+                msg = json.dumps({"t": "preview-request", "path": path, "value": value})
+                rc, out = run_as("ada", f"printf '%s\\n' {shlex.quote(msg)} | socat -t 2 - UNIX-CONNECT:/run/loom/chat/ada.ctl")
+                assert rc == 0 and json.loads(out.strip().splitlines()[-1])["ok"] is True, out
+                p = wait_preview("refused")
+                assert p["reason"], p
+                assert chat("preview", "allow").startswith("not now"), "a refused preview can't be allowed"
+            # the bridge itself refuses anything but data
+            rc, out = run_as("ada", "printf '%s\\n' '{\"t\": \"preview-request\", \"path\": \"x\", \"value\": {\"lua\": 1}}' | socat -t 2 - UNIX-CONNECT:/run/loom/chat/ada.ctl")
+            assert json.loads(out.strip().splitlines()[-1])["ok"] is False, out
+            machine.fail("test -e /tmp/pwned")
             d = j(ada("omanix try omanix.hyprland.extraLua '\"x\"' --json"), want=2)
+            machine.sleep(1)
+            machine.screenshot("preview-refused")
+
+        with subtest("options browser: search the catalogs, see the current value, ask the agent to change it"):
+            chat("searchOptions", "default terminal")
+            for _ in range(60):
+                st = chat_state()
+                if not st["options"]["busy"] and st["options"]["total"] > 0:
+                    break
+                time.sleep(0.5)
+            o = chat_state()["options"]
+            print(o)
+            assert o["results"][0]["path"] == "omanix.defaults.terminal", o
+            assert o["results"][0]["current"] == '"alacritty"', o
+            machine.sleep(1)
+            machine.screenshot("options-browser")
+            assert chat("askOption", "0") == "ok"
+            st = chat_state()
+            assert st["view"] == "chat" and st["composer"] == 'Change omanix.defaults.terminal (now "alacritty") to ', st
+            assert st["source"] == "from options browser", st
+            machine.sleep(1)
+            machine.screenshot("options-ask")
+        no_errors = machine.execute("journalctl -b --no-pager _UID=${uid} | grep -i 'omanix-chat' | grep -i 'error\\|is not a type\\|not defined\\|cannot assign\\|unable'")[1]
+        assert no_errors.strip() == "", no_errors
       '';
 
       plugin-fixture = ''

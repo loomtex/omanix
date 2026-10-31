@@ -148,7 +148,50 @@ def _code(result: str) -> int:
             "waiting": EXIT.APPROVAL}.get(result, EXIT.FAILED)
 
 
-def do_propose(ctx, request: str | None, ref: str = "HEAD", wait: bool = True) -> dict:
+# What the chat shows when the watchdog rolls a switch back (§g.5): the
+# failing check in plain words. omanix's checks are modules/omanix/health.nix.
+CHECK_WORDS = {
+    "hyprland-ipc": "Hyprland didn't answer",
+    "hyprland-display": "Hyprland lost its display",
+    "hyprland-configerrors": "Hyprland reported errors in the new config",
+    "omanix-shell": "the desktop shell stopped",
+    "target": "the system didn't reach its target",
+    "network": "the network dropped",
+    "silo": "silo became unreachable",
+}
+
+
+def plain_reason(reason: str | None) -> str:
+    """loom-switch's rollback reason → a short sentence for the chat."""
+    if not reason:
+        return "a health check failed"
+    m = re.match(r"health check (\S+) failed(.*)$", reason)
+    if m and m.group(1) in CHECK_WORDS:
+        return CHECK_WORDS[m.group(1)] + m.group(2)
+    for k in ("the system didn't reach its target", "network connectivity dropped", "silo became unreachable"):
+        if reason.startswith(k):
+            return reason
+    return reason
+
+
+def _tell_chat(ctx, result: str, tip: str):
+    """The resident's bridge shows applied / rolled back rows (Undo, Why?)
+    to the human (loom.chat/v1 control socket). Best effort."""
+    if not ctx.is_agent or result not in ("applied", "rolled-back"):
+        return
+    from .cmd_info import _last_switch
+    sw = _last_switch(ctx.cfg) or {}
+    if sw.get("tip") and sw["tip"] != tip:
+        sw = {}
+    msg = {"t": "applied", "tip": tip} if result == "applied" else {"t": "rolledback", "tip": tip, "check": plain_reason(sw.get("reason"))}
+    try:
+        from .cmd_session import _ctl, _send_ctl
+        _send_ctl(_ctl(ctx), msg)
+    except (OSError, ValueError):
+        pass
+
+
+def do_propose(ctx, request: str | None, ref: str = "HEAD", wait: bool = True, out_path: str | None = None) -> dict:
     repo = ctx.repo()
     tip = ctx.git("rev-parse", "--verify", f"{ref}^{{commit}}")
     dirty = [l for l in ctx.git("status", "--porcelain", "--untracked-files=no", check=False).splitlines() if l.strip()]
@@ -161,7 +204,10 @@ def do_propose(ctx, request: str | None, ref: str = "HEAD", wait: bool = True) -
     except (OSError, json.JSONDecodeError):
         pass
     reused = None
-    if last.get("repo") == str(repo) and last.get("head") == tip and last.get("clean") and os.path.exists(last.get("out", "")):
+    if out_path:
+        args += ["--out", out_path]
+        reused = out_path
+    elif last.get("repo") == str(repo) and last.get("head") == tip and last.get("clean") and os.path.exists(last.get("out", "")):
         args += ["--out", last["out"]]
         reused = last["out"]
     out = {"tip": tip, "request": request, "reusedBuild": reused, "uncommitted": [l[3:] for l in dirty]}
@@ -169,6 +215,7 @@ def do_propose(ctx, request: str | None, ref: str = "HEAD", wait: bool = True) -
         r = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         res = _result(r.returncode, r.stderr)
         out.update({"result": res, "loomExit": r.returncode, "log": tail(r.stderr + r.stdout, 40)})
+        _tell_chat(ctx, res, tip)
         return out
     log = _state(ctx) / f"propose-{time.strftime('%Y%m%dT%H%M%S')}-{tip[:12]}.log"
     fh = open(log, "w")
@@ -187,7 +234,7 @@ def do_propose(ctx, request: str | None, ref: str = "HEAD", wait: bool = True) -
 
 @handler("core", "propose")
 def propose(ctx, a):
-    out = do_propose(ctx, a.request, a.ref, wait=not a.no_wait)
+    out = do_propose(ctx, a.request, a.ref, wait=not a.no_wait, out_path=a.out)
     out["_exit"] = _code(out["result"])
     msg = {"applied": "Applied.", "denied": "The human denied it.", "rolled-back": "Applied, failed its health checks, rolled back.",
            "refused": "loom-switch refused it (no card).", "waiting": "The card is up; the human decides.",

@@ -52,10 +52,16 @@ let
   # package the host doesn't allow, say) becomes "<not rendered>" instead of
   # failing the host's build.
   safe = v: let r = builtins.tryEval (builtins.deepSeq v v); in if r.success then r.value else { _type = "literalExpression"; text = "<not rendered>"; };
-  doc = opts:
+  # Option names are relative to the configuration's root: a host evaluated
+  # inside something else (a NixOS VM test's nodes.<name>, HM's
+  # home-manager.users.<user>) would otherwise list every option under that
+  # prefix. `anchor` is a known option of the set and its relative path.
+  doc = anchor: rel: opts:
     let
+      prefix = lib.take (builtins.length anchor.loc - builtins.length rel) anchor.loc;
+      relName = o: if lib.take (builtins.length prefix) o.loc == prefix then lib.showOption (lib.drop (builtins.length prefix) o.loc) else o.name;
       entries = lib.filter (o: o.visible && !o.internal) (lib.optionAttrSetToDocList opts);
-      entry = o: let t = transform o; in {
+      entry = o: let t = transform (o // { name = relName o; }); in {
         name = t.name;
         value = removeAttrs t [ "name" "visible" "internal" "loc" "relatedPackages" ]
           // lib.optionalAttrs (t ? default) { default = safe t.default; }
@@ -240,8 +246,8 @@ let
   ];
 
   spec = {
-    optionsNixos = doc nixosOptions;
-    optionsHome = doc homeOptions;
+    optionsNixos = doc options.omanix.enable [ "omanix" "enable" ] nixosOptions;
+    optionsHome = doc homeOptions.home.packages [ "home" "packages" ] homeOptions;
     sharedOrigins = shared;
     config = configJson;
     host = hostJson;

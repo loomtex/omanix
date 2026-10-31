@@ -321,13 +321,13 @@ in
                 assert d["error"], d
             machine.fail("test -e /tmp/pwned")
 
+        import time   # only this variant sleeps
         CHAT = "/run/current-system/omarchy/bin/omarchy-shell omanix.chat "
         def chat(*args):
             return machine.succeed("su - ${user} -c " + shlex.quote(HY + CHAT + " ".join(shlex.quote(a) for a in args))).strip()
         def chat_state():
             return json.loads(chat("state"))
         def wait_preview(state, timeout=30):
-            import time   # only this variant sleeps
             for _ in range(timeout * 2):
                 p = chat_state()["preview"]
                 if p and p["state"] == state:

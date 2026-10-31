@@ -16,6 +16,9 @@ loom.lib // {
   home = import ./home { inherit lib; };
   fork = import ./fork.nix { inherit lib; inherit (inputs) omarchy; };
 
+  # The omanix USB installer on loom.lib.mkInstallerSystem (§e.1, W20).
+  installer = import ./installer.nix { inherit inputs omanix; };
+
   # loom's force-allowlist plus omanix's own entries (checks.priorities).
   forceAllowlist = loom.lib.forceAllowlist ++ import ./force-allowlist.nix;
 }

@@ -60,6 +60,13 @@ in
     hardware.i2c.enable = lib.mkDefault true;                     # ddcutil (external monitor brightness)
     services.hardware.bolt.enable = lib.mkDefault true;           # thunderbolt authorisation
     documentation.man.enable = lib.mkDefault true;
+    # /share/doc of every package (python's alone is 57 MiB) stays out of the
+    # system; man pages stay. omarchy has no speech stack, and nixpkgs'
+    # graphical-desktop turns speech-dispatcher on with mbrola's 645 MiB of
+    # voices (mkDefault there, so one step above it here; a host's plain
+    # `true` still wins). Both are closure-budget trims (§e.1).
+    documentation.doc.enable = lib.mkDefault false;
+    services.speechd.enable = lib.mkOverride 999 false;
     programs.bash.completion.enable = lib.mkDefault true;
   };
 }

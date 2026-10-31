@@ -78,12 +78,14 @@
 
       packages = forAllSystems (system:
         let pkgs = pkgsFor system; in
-        lib.genAttrs byName (name: pkgs.${name}) // { default = pkgs.omarchy-src; });
+        lib.genAttrs byName (name: pkgs.${name}) // { default = pkgs.omarchy-src; }
+        // import ./lib/installer-packages.nix { inherit pkgs; omanix = self; }
+        // { inherit (import ./lib/tools.nix { inherit pkgs; omanix = self; }) omanix-configure loom-flash; });
 
       checks = forAllSystems (system:
         import ./checks { pkgs = pkgsFor system; inherit self inputs; });
 
-      apps = forAllSystems (system: import ./apps { pkgs = pkgsFor system; });
+      apps = forAllSystems (system: import ./apps { pkgs = pkgsFor system; omanix = self; });
 
       formatter = forAllSystems (system: (pkgsFor system).nixfmt-rfc-style);
     };

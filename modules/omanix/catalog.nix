@@ -285,6 +285,22 @@ in
       defaultText = lib.literalExpression "config.omanix.enable";
       description = "Build the catalogs into the system (`/run/current-system/sw/share/omanix/catalog`).";
     };
+    hostgen = lib.mkOption {
+      type = lib.types.attrsOf lib.types.anything;
+      readOnly = true;
+      default = hostgenJson // {
+        # the registry's upstream themes, read from the pinned source (no
+        # build output is read at evaluation): the installer bakes this in
+        theme = builtins.attrNames (lib.filterAttrs (_: t: t == "directory") (builtins.readDir "${cfg.fork.src}/themes"));
+      };
+      defaultText = lib.literalExpression "{ theme = [ … ]; defaults = { terminal = [ … ]; … }; apps = [ … ]; }";
+      description = ''
+        The theme/defaults/apps enums `loom-hostgen --catalog` validates
+        answers against, as a value: the installer and `configure` use it
+        without building the catalogs. Equal to the catalog's hostgen.json
+        (checks.hostgen-catalog).
+      '';
+    };
     package = lib.mkOption {
       type = lib.types.package;
       readOnly = true;

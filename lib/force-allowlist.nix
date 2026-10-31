@@ -188,4 +188,8 @@
     option = "users.groups.omanix-spool";
     reason = "omanix's own group (the human may write the browser color spool)";
   }
+  {
+    option = "services.speechd.enable";
+    reason = "nixpkgs' graphical-desktop sets it with mkDefault (645 MiB of mbrola voices); omarchy has no speech stack, so off one step above (999), and a host's plain `true` still wins";
+  }
 ]

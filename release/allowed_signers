@@ -1,0 +1,11 @@
+# omanix release signers (§e.10, D11): Josh's YubiKey SSH signing key(s).
+# Published copy; users pin it out of band (~/.config/omanix/allowed_signers)
+# after comparing the fingerprint with silo, github and the README.
+#
+# One line per key, namespaces "git" (signed tags) and "omanix-release"
+# (SHA256SUMS.sig, scripts/SHA256SUMS.sig):
+#
+#   josh@6bit.com namespaces="git,omanix-release" sk-ssh-ed25519@openssh.com AAAA…
+#
+# EMPTY UNTIL THE FIRST REAL RELEASE: every verifier (omanix-release verify,
+# loom-flash, the scripts' preamble) refuses a signers file with no key.

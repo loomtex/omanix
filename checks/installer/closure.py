@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 
 STORE = re.compile(r"^/nix/store/[0-9a-z]{32}-(.*)$")
@@ -65,6 +66,17 @@ def registration_sizes(store_paths):
     return sizes
 
 
+def zstd_bytes(path):
+    """The image as a .raw.zst download would be (zstd -10 --long=27)."""
+    p = subprocess.Popen(["zstd", "-q", "-10", "--long=27", "-T0", "-c", path], stdout=subprocess.PIPE)
+    n = 0
+    for chunk in iter(lambda: p.stdout.read(1 << 20), b""):
+        n += len(chunk)
+    if p.wait() != 0:
+        sys.exit(f"zstd failed on {path}")
+    return n
+
+
 def budget(a):
     b = json.load(open(a.budget))
     rep = {"budget": b, "images": {}, "closures": {}}
@@ -73,7 +85,10 @@ def budget(a):
         raws = [f for f in os.listdir(d) if f.endswith(".raw")]
         if len(raws) != 1:
             sys.exit(f"{d}: expected one .raw image, found {raws}")
-        rep["images"][label] = {"file": raws[0], "bytes": os.path.getsize(os.path.join(d, raws[0]))}
+        f = os.path.join(d, raws[0])
+        st = os.stat(f)
+        rep["images"][label] = {"file": raws[0], "bytes": st.st_size, "allocatedBytes": st.st_blocks * 512,
+                                "zstdBytes": zstd_bytes(f)}
     rep["cache"] = json.load(open(a.cache))
     for spec in a.closure:
         label, p = spec.split("=", 1)
@@ -84,8 +99,10 @@ def budget(a):
     rep["docOutputs"] = {"bytes": sum(docs.values()), "paths": sorted(os.path.basename(p) for p in docs)}
 
     gib, mib = 1024 ** 3, 1024 ** 2
-    print(f"offline image  {rep['images']['offline']['bytes'] / gib:6.2f} GiB  (budget {b['offlineImage'] / gib:.2f} GiB)")
-    print(f"net image      {rep['images']['net']['bytes'] / 1e6:8.1f} MB   (budget {b['netImage'] / 1e6:.0f} MB)")
+    for label, key in (("offline", "offlineImage"), ("net", "netImage")):
+        im = rep["images"][label]
+        print(f"{label:7} image  {im['bytes'] / gib:6.2f} GiB raw, what a release ships (budget {b[key] / gib:.2f} GiB); "
+              f"{im['zstdBytes'] / gib:.2f} GiB as .raw.zst, {im['allocatedBytes'] / gib:.2f} GiB allocated (sparse)")
     print(f"CACHE          {rep['cache']['fileSize'] / gib:6.2f} GiB compressed, {rep['cache']['narSize'] / gib:.2f} GiB NAR, "
           f"{rep['cache']['paths']} paths ({rep['cache']['skippedLive']} already in the live store)")
     for label, c in rep["closures"].items():

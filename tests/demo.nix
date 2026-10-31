@@ -768,7 +768,12 @@ pkgs.testers.runNixOSTest {
 
         with subtest("loom propose → pkexec loom-switch-request → a card without review → approved → promoted"):
             machine.execute("su - ${user} -c " + shlex.quote(ENV + "cd ~/omanix-host && (systemd-run --user --quiet --collect --same-dir -- sh -c 'loom propose --out \"$(readlink -f /run/demo/out-bar-bottom)\" > /tmp/human-propose.log 2>&1; echo rc=$? >> /tmp/human-propose.log') "))
-            s = until(lambda: (lambda s: s if s["shown"] in ("card", "banner") else None)(state("omanix.approval")), "the card", 300)
+            try:
+                s = until(lambda: (lambda s: s if s["shown"] in ("card", "banner") else None)(state("omanix.approval")), "the card", 300)
+            except AssertionError:
+                print(machine.execute("cat /tmp/human-propose.log; loginctl list-sessions; "
+                                      "journalctl -b --no-pager | grep -iE 'pkexec|polkit|loom-switch|nuketown-approve' | tail -n 30")[1])
+                raise
             time.sleep(2)
             d = request_dir()
             req = jfile(f"{d}request.json")

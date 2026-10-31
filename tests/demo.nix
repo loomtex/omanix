@@ -174,7 +174,8 @@ pkgs.testers.runNixOSTest {
         print(machine.execute("journalctl -b --no-pager -n 150 _UID=${uid} | grep -iv 'layershell screen'; "
                               "journalctl -b --no-pager -n 60 -u 'loom-agent-bridge@*' -u 'loom-switch-*' -u nuketown-approval; "
                               "ls -la /agents/ada/demo 2>&1; tail -n 40 /agents/ada/demo/*.json 2>&1; "
-                              "ps -eo pid,user,args | grep -E 'pkexec|loom|nuketown|polkit' | grep -v grep")[1])
+                              "ps -eo pid,user,args | grep -E 'pkexec|loom|nuketown|polkit' | grep -v grep; "
+                              "cat /tmp/human-propose.log 2>/dev/null")[1])
         try:
             print("chat rows:", json.dumps(state("omanix.chat").get("rows"))[-3000:])
         except Exception as e:
@@ -603,6 +604,7 @@ pkgs.testers.runNixOSTest {
             n_applied, _, _ = last_switch()
             until(lambda: any(x["kind"] == "applied" for x in rows()), "the applied row (Undo)", 30)
             machine.screenshot("6-applied-undo")
+            print(machine.execute("ls -l /run/wrappers/bin/pkexec; for p in $(pgrep -u ${user} -f 'omarchy-shell|quickshell|Hyprland'); do echo \"$p $(tr '\\0' ' ' < /proc/$p/cmdline | cut -c1-60) $(grep NoNewPrivs /proc/$p/status)\"; done")[1])
             ipc("omanix.chat", "undo")
             card("banner", "routine", 180)
             d = request_dir()
@@ -667,10 +669,13 @@ pkgs.testers.runNixOSTest {
         with subtest("the approval requests, as audited (the run directory is gone)"):
             out = sh("ls -l /var/lib/nuketown-approval/; ls /var/lib/nuketown-approval/*/")
             print(out)
-            rid = sh("ls -t /var/lib/nuketown-approval | head -n1").strip()
+            # the journal request (the latest is the refused `sudo id` probe: a decision, no card)
+            rid = sh("grep -l journalctl /var/lib/nuketown-approval/*/request.json | head -n1 | xargs dirname | xargs basename").strip()
             req = jfile(f"/var/lib/nuketown-approval/{rid}/request.json")
             assert req["requester"] == "ada" and "journalctl" in " ".join(req["argv"]), req
-            assert jfile(f"/var/lib/nuketown-approval/{rid}/decision.json")["decision"] in ("approve", "approved", "APPROVED") or True
+            dec = jfile(f"/var/lib/nuketown-approval/{rid}/decision.json")
+            print("decision:", dec)
+            assert "approv" in json.dumps(dec).lower(), dec
             sh(f"test ! -e /run/nuketown-approval/{rid}")
             # the human (group nuketown-approval-read) can read them
             human(f"cat /var/lib/nuketown-approval/{rid}/request.json > /dev/null")
@@ -762,7 +767,7 @@ pkgs.testers.runNixOSTest {
             human("cd ~/omanix-host && demo-edit append configuration.nix '  omanix.shell.settings.bar.position = \"bottom\";' && git commit -qam 'bar at the bottom'")
 
         with subtest("loom propose → pkexec loom-switch-request → a card without review → approved → promoted"):
-            machine.execute("su - ${user} -c " + shlex.quote(ENV + "cd ~/omanix-host && (systemd-run --user --quiet --collect -- sh -c 'loom propose --out \"$(readlink -f /run/demo/out-bar-bottom)\" > /tmp/human-propose.log 2>&1; echo rc=$? >> /tmp/human-propose.log') "))
+            machine.execute("su - ${user} -c " + shlex.quote(ENV + "cd ~/omanix-host && (systemd-run --user --quiet --collect --same-dir -- sh -c 'loom propose --out \"$(readlink -f /run/demo/out-bar-bottom)\" > /tmp/human-propose.log 2>&1; echo rc=$? >> /tmp/human-propose.log') "))
             s = until(lambda: (lambda s: s if s["shown"] in ("card", "banner") else None)(state("omanix.approval")), "the card", 300)
             time.sleep(2)
             d = request_dir()

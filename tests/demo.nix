@@ -771,7 +771,11 @@ pkgs.testers.runNixOSTest {
             try:
                 s = until(lambda: (lambda s: s if s["shown"] in ("card", "banner") else None)(state("omanix.approval")), "the card", 300)
             except AssertionError:
-                print(machine.execute("cat /tmp/human-propose.log; loginctl list-sessions; "
+                print(machine.execute("cat /tmp/human-propose.log; loginctl list-sessions; loginctl show-user ${user} -p Display; "
+                                      "h=$(grep -o '/nix/store/[^\"]*loom-seat-active' /etc/polkit-1/rules.d/*.rules | head -n1); echo helper=$h; "
+                                      "for s in 1 2; do runuser -u polkituser -- $h ${user} $s; echo \"seat-active $s: $?\"; done; "
+                                      "ps -eo pid,user,args | grep -E 'pkexec|loom-switch|polkit' | grep -v grep; "
+                                      "for p in $(pgrep -x pkexec); do pkcheck --action-id farm.loom.propose --process $p; echo pkcheck=$?; done; "
                                       "journalctl -b --no-pager | grep -iE 'pkexec|polkit|loom-switch|nuketown-approve' | tail -n 30")[1])
                 raise
             time.sleep(2)

@@ -36,7 +36,7 @@ Item {
   property bool expanded: false      // a routine banner opened into the full card
   property bool engaged: false       // the human clicked into the card: it has the keyboard
   property bool denyOpen: false
-  property string detailPanel: ""    // "", "diff", "nvd", "command"
+  property string detailPanel: ""    // "", "diff", "nvd", "info" (summary, can't see; a root card's command and script)
   property string detailText: ""
   property bool passwdOpen: false
   property var targets: ({})         // named controls, for geometry() (VM tests)
@@ -53,8 +53,11 @@ Item {
   readonly property bool cardShown: !!model && !pinentryUp && (model.form !== "routine" || expanded)
   readonly property bool bannerShown: !!model && !pinentryUp && model.form === "routine" && !expanded
 
-  onCurrentChanged: { expanded = false; engaged = false; denyOpen = false; detailPanel = ""; detailText = "" }
-  onModelChanged: if (model && model.detailsOpen && detailPanel === "" && current) showDetail("command")
+  // Reset only for another request: reloading this one (the review landing)
+  // updates the card in place, keeping an open reason field or details.
+  readonly property string currentId: current ? current.id : ""
+  onCurrentIdChanged: { expanded = false; engaged = false; denyOpen = false; detailPanel = ""; detailText = "" }
+  onModelChanged: if (model && model.detailsOpen && detailPanel === "" && current) showDetail("info")
 
   function register(name, item, win) {
     var next = ({})
@@ -165,6 +168,7 @@ Item {
     detailPanel = which
     detailText = ""
     var dir = current.dir
+    if (which === "info" && model && model.kind !== "root") return   // the review's details only
     var script = which === "diff" ? "cat \"$1/kind/stat.txt\"; echo; head -c 204800 \"$1/kind/diff.txt\""
       : which === "nvd" ? "head -c 204800 \"$1/kind/nvd.txt\""
       : "jq -r '.snapshots[] | [.snapshot, .path, .sha256, (if .executed then \"runs\" else \"review only\" end)] | @tsv' \"$1/request.json\" | "
@@ -209,7 +213,9 @@ Item {
       return JSON.stringify({ pending: root.pendingCount, current: root.current ? root.current.id : "",
         form: root.model ? root.model.form : "", shown: root.cardShown ? "card" : (root.bannerShown ? "banner" : "none"),
         engaged: root.engaged, pinentry: root.pinentryUp, detail: root.detailPanel, denyOpen: root.denyOpen,
-        approveLabel: root.model ? root.model.approveLabel : "" })
+        approveLabel: root.model ? root.model.approveLabel : "",
+        review: root.model ? root.model.review.state : "", headline: root.model ? root.model.review.headline : "",
+        reason: reasonField.text })
     }
     // Screen coordinates of a named control's center (VM tests drive clicks).
     function geometry(name: string): string {
@@ -337,6 +343,21 @@ Item {
             }
           }
 
+          // A root card's command, as the reviewer and the details see it.
+          Text {
+            visible: !!root.model && root.model.kind === "root"
+            width: parent.width
+            leftPadding: Style.space(12)
+            maximumLineCount: 3
+            elide: Text.ElideRight
+            wrapMode: Text.WrapAnywhere
+            textFormat: Text.PlainText
+            text: root.model && root.model.command ? root.model.command.display : ""
+            color: root.fg
+            font.family: root.mono
+            font.pixelSize: Style.font.body
+          }
+
           Text {
             textFormat: Text.PlainText
             text: root.model ? root.model.requestHeading : ""
@@ -382,8 +403,10 @@ Item {
             }
           }
 
-          // The reviewer's words: proportional italic on a tint, labelled as
-          // fallible, the recommendation as a word (§h.4).
+          // The review (§h.4), labelled as fallible: a risk badge, the
+          // recommendation as a word and the reviewer's headline, then its
+          // concerns. The summary and "Can't see" are details (ⓘ). A pending
+          // review is a spinner line; the card updates in place when it lands.
           Rectangle {
             width: parent.width
             height: reviewColumn.implicitHeight + Style.space(16)
@@ -404,43 +427,81 @@ Item {
                 font.pixelSize: Style.font.caption
                 font.bold: true
               }
-              Text {
+              Item {
+                id: reviewLine
+                visible: !!root.model && root.model.review.state !== "none"
                 width: parent.width
-                visible: text !== ""
-                wrapMode: Text.Wrap
-                textFormat: Text.PlainText
-                text: root.model ? root.model.review.summary : ""
-                color: root.fg
-                font.italic: true
-                font.pixelSize: Style.font.body
+                height: Math.max(headlineText.implicitHeight, riskBadge.visible ? riskBadge.height : 0, busy.visible ? busy.height : 0)
+                readonly property string risk: root.model ? root.model.review.risk : ""
+                Rectangle {
+                  id: riskBadge
+                  visible: !!root.model && root.model.review.state === "ok"
+                  width: visible ? badgeText.implicitWidth + Style.space(12) : 0
+                  height: badgeText.implicitHeight + Style.space(4)
+                  radius: Style.space(4)
+                  color: reviewLine.risk === "high" ? Commons.Color.urgent
+                    : reviewLine.risk === "medium" ? "#b7791f"
+                    : reviewLine.risk === "low" ? "#3f7f4f" : Commons.Color.muted
+                  Text {
+                    id: badgeText
+                    anchors.centerIn: parent
+                    textFormat: Text.PlainText
+                    text: root.model ? root.model.review.badge : ""
+                    color: "#ffffff"
+                    font.family: root.mono
+                    font.pixelSize: Style.font.caption
+                    font.bold: true
+                  }
+                }
+                BusyIndicator {
+                  id: busy
+                  visible: !!root.model && root.model.review.state === "pending"
+                  running: visible
+                  width: visible ? Style.space(20) : 0
+                  height: Style.space(20)
+                }
+                Text {
+                  id: headlineText
+                  x: (riskBadge.visible ? riskBadge.width : 0) + (busy.visible ? busy.width : 0) + Style.space(8)
+                  width: parent.width - x
+                  wrapMode: Text.Wrap
+                  textFormat: Text.PlainText
+                  text: root.model ? (root.model.review.state === "ok" ? root.model.review.recWord + " · " : "") + root.model.review.headline : ""
+                  color: root.fg
+                  font.pixelSize: Style.font.body
+                  font.bold: !!root.model && root.model.review.state === "ok"
+                }
               }
               Repeater {
                 model: root.model ? root.model.review.notes : []
                 Text {
                   required property var modelData
-                  required property int index
                   width: reviewColumn.width
+                  leftPadding: Style.space(12)
                   wrapMode: Text.Wrap
                   textFormat: Text.PlainText
-                  text: (index + 1) + ". " + modelData
+                  text: "• " + modelData
                   color: root.fg
                   font.italic: true
                   font.pixelSize: Style.font.body
                 }
               }
-              Text {
-                visible: !!root.model && root.model.review.state === "ok"
-                width: parent.width
-                wrapMode: Text.Wrap
-                textFormat: Text.PlainText
-                text: root.model && root.model.review.state === "ok"
-                  ? (root.model.kind === "root" ? "Can't see: " + (root.model.review.notShown.length ? root.model.review.notShown.join("; ") : "nothing") + ".  " : "")
-                    + "Risk: " + root.model.review.risk.toUpperCase() + ".  Recommends: " + root.model.review.recWord
-                  : ""
-                color: root.fg
-                font.pixelSize: Style.font.body
-                font.bold: true
-              }
+            }
+          }
+
+          // ⓘ: the details, in place.
+          Item {
+            width: parent.width
+            height: infoButton.implicitHeight
+            CardButton {
+              id: infoButton
+              anchors.right: parent.right
+              text: "i"
+              round: true
+              ToolTip.visible: hovered
+              ToolTip.text: "Details"
+              onClicked: root.showDetail("info")
+              Component.onCompleted: root.register("card.info", infoButton, "card")
             }
           }
 
@@ -458,12 +519,23 @@ Item {
                 id: detailBody
                 spacing: 0
                 Text {
-                  visible: root.detailPanel === "command" && !!root.model && !!root.model.command
+                  visible: root.detailPanel === "info" && !!root.model && root.model.review.state !== "none"
+                  width: cardColumn.width - Style.space(24)
+                  wrapMode: Text.Wrap
+                  textFormat: Text.PlainText
+                  text: root.model
+                    ? root.model.review.summary + (root.model.review.state === "ok" ? "\nCan't see: " + CardModel.cantSee(root.model.review.notShown) : "") + "\n"
+                    : ""
+                  color: root.fg
+                  font.italic: true
+                  font.pixelSize: Style.font.body
+                }
+                Text {
+                  visible: root.detailPanel === "info" && !!root.model && !!root.model.command
                   textFormat: Text.PlainText
                   text: root.model && root.model.command
                     ? "runs as " + root.model.command.runAs + ":\n" + root.model.command.argv.map(function(a, i) { return "  argv[" + i + "] " + a }).join("\n")
-                      + (root.model.command.decrypt.length ? "\nalso decrypts: " + root.model.command.decrypt.join(", ") : "")
-                      + (root.model.command.notSnapshotted.length ? "\nnot snapshotted: " + root.model.command.notSnapshotted.join("; ") : "") + "\n"
+                      + (root.model.command.decrypt.length ? "\nalso decrypts: " + root.model.command.decrypt.join(", ") : "") + "\n"
                     : ""
                   color: root.fg
                   font.family: root.mono
@@ -486,21 +558,28 @@ Item {
             }
           }
 
-          Row {
+          // Deny's optional reason, in the card: Enter (or Deny again) sends
+          // it, Escape goes back and hands the keyboard back.
+          Column {
             visible: root.denyOpen
             width: parent.width
-            spacing: Style.space(8)
+            spacing: Style.space(4)
             TextField {
               id: reasonField
-              width: parent.width - denyButton.width - Style.space(8)
-              placeholderText: "Reason (" + root.agent + " sees it as your reply)"
+              width: parent.width
+              placeholderText: "Reason (optional; " + root.agent + " sees it as your reply)"
               maximumLength: 500
               color: root.fg
               font.family: root.mono
               onAccepted: root.decide("deny", text)
               Component.onCompleted: root.register("card.reason", reasonField, "card")
             }
-            CardButton { id: denyButton; text: "Deny"; warn: true; onClicked: root.decide("deny", reasonField.text); Component.onCompleted: root.register("card.denyConfirm", denyButton, "card") }
+            Text {
+              textFormat: Text.PlainText
+              text: "Enter denies with this reason · Escape goes back"
+              color: Util.alpha(root.fg, 0.6)
+              font.pixelSize: Style.font.caption
+            }
           }
 
           Item {
@@ -524,9 +603,13 @@ Item {
               anchors.right: parent.right
               spacing: Style.space(8)
               CardButton {
-                text: root.model ? root.model.denyLabel : "Deny with reason…"
+                text: root.model ? root.model.denyLabel : "Deny"
                 id: cDeny
-                onClicked: { root.engaged = true; root.denyOpen = true; reasonField.text = ""; reasonField.forceActiveFocus() }
+                warn: root.denyOpen
+                onClicked: {
+                  if (root.denyOpen) { root.decide("deny", reasonField.text); return }
+                  root.engaged = true; root.denyOpen = true; reasonField.text = ""; reasonField.forceActiveFocus()
+                }
                 Component.onCompleted: root.register("card.deny", cDeny, "card")
               }
               CardButton {

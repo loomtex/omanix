@@ -14,7 +14,7 @@
 #                  and nvd diffs → Deny "keep Bluetooth" → the resident
 #                  recommits → one-line card → approved
 #   vm-demo-5      Wi-Fi: a 14-line root script; the review flags line 9;
-#                  Show command and script (line numbers); Deny → resident
+#                  ⓘ: command and script (line numbers); Deny → resident
 #                  drops line 9 → approved → saved networks intact; then a
 #                  change card
 #   vm-demo-6      a monitor rule turns off the only screen → the watchdog
@@ -527,9 +527,9 @@ pkgs.testers.runNixOSTest {
             assert rv["recommendation"] == "deny" and rv["risk"] == "high" and rv["notes"][0].startswith("line 9"), rv
             machine.screenshot("5-root-card")
 
-        with subtest("Show command and script: the snapshot that will run, with line numbers"):
-            click("card.command")
-            assert state("omanix.approval")["detail"] == "command"
+        with subtest("ⓘ: the command and the snapshot that will run, with line numbers"):
+            click("card.info")
+            assert state("omanix.approval")["detail"] == "info"
             time.sleep(1)
             machine.screenshot("5-command-and-script")
 

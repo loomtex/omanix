@@ -1,0 +1,3 @@
+{"n":8,"tip":"2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e","base":"1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d","out":"/nix/store/0000000000000000000000000000000c-nixos-system-kestrel","prev":"/nix/store/0000000000000000000000000000000a-nixos-system-kestrel",
+ "kind":"change","title":"make my laptop last longer on battery","request":"make my laptop last longer on battery","flags":[],"flagLine":"",
+ "packages":"+1 (tlp 1.7.0) · 0 removed · 0 upgraded","files":["configuration.nix","modules/power.nix"],"lastRejection":null,"notLoomSwitched":false,"full":false}

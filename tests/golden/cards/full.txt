@@ -6,12 +6,10 @@
 │ Files      configuration.nix, modules/power.nix                                        │
 │ Build      ok                                                                          │
 ├─ AI REVIEW · can be wrong ─────────────────────────────────────────────────────────────┤
-│ Enables TLP and lowers the screen refresh rate. It also turns Bluetooth off at boot,   │
-│ which you did not ask for.                                                             │
-│   1. modules/power.nix line 9 sets hardware.bluetooth.powerOnBoot = false; the request │
+│ [MEDIUM] LOOK CLOSER · Saves battery, but also turns Bluetooth off at every boot.      │
+│   • modules/power.nix line 9 sets hardware.bluetooth.powerOnBoot = false; the request  │
 │   doesn't mention Bluetooth                                                            │
-│ Risk: MEDIUM.  Recommends: LOOK CLOSER                                                 │
+│                                                                                    (i) │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
-│ [Show git diff]  [nvd diff]                                                            │
-│                                         [Deny with reason…]   [Approve]                │
+│ [Show git diff]  [nvd diff]             [Deny]   [Approve]                             │
 └────────────────────────────────────────────────────────────────────────────────────────┘

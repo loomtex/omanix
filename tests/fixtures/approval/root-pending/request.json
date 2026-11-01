@@ -1,0 +1,6 @@
+{"id":"20261029T120200-c41d","requester":"ada","origin":"agent","time":"2026-10-29T12:02:00Z","cwd":"/agents/ada/scratch","why":"wifi keeps dropping; reset the driver and NetworkManager",
+ "kind":null,"prompt_timeout":120,
+ "run_as":{"user":"root","group":"","login":false,"shell":false,"set_home":false},
+ "argv":["bash","fix-wifi.sh"],"exec_argv":["bash","/run/nuketown-approval/20261029T120200-c41d/snapshots/0/fix-wifi.sh"],
+ "display":"bash fix-wifi.sh","decrypt":[],
+ "snapshots":[{"path":"/agents/ada/scratch/fix-wifi.sh","snapshot":"snapshots/0/fix-wifi.sh","sha256":"7077deb9bc1e5ed00884682227f41d84d8e8f27e430662ea3c9b81e79181b86b","executed":true}]}

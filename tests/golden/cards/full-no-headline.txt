@@ -1,0 +1,16 @@
+┌─ Approve a change to this computer ─────────────────────────────────── 1 of 2 pending ─┐
+│ YOUR REQUEST (as ada relayed it)                                                       │
+│   make my laptop last longer on battery                                                │
+├─ WHAT CHANGES ─────────────────────────────────────────────────────────────────────────┤
+│ Packages   +1 (tlp 1.7.0) · 0 removed · 0 upgraded                                     │
+│ Files      configuration.nix, modules/power.nix                                        │
+│ Build      ok                                                                          │
+├─ AI REVIEW · can be wrong ─────────────────────────────────────────────────────────────┤
+│ [MEDIUM] LOOK CLOSER · Enables TLP and lowers the screen refresh rate. It also turns   │
+│ Bluetooth off at boot, which you did not ask for.                                      │
+│   • modules/power.nix line 9 sets hardware.bluetooth.powerOnBoot = false; the request  │
+│   doesn't mention Bluetooth                                                            │
+│                                                                                    (i) │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ [Show git diff]  [nvd diff]             [Deny]   [Approve]                             │
+└────────────────────────────────────────────────────────────────────────────────────────┘

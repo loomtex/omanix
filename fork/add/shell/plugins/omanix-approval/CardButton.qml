@@ -10,12 +10,14 @@ Rectangle {
   property string text: ""
   property bool primary: false
   property bool warn: false
+  property bool round: false          // a small circle (the card's ⓘ)
+  readonly property bool hovered: mouse.containsMouse
   property color foreground: Commons.Color.popups.text
   signal clicked()
 
-  implicitWidth: label.implicitWidth + Style.space(24)
-  implicitHeight: Math.max(Style.space(30), label.implicitHeight + Style.space(12))
-  radius: Style.cornerRadius
+  implicitWidth: round ? implicitHeight : label.implicitWidth + Style.space(24)
+  implicitHeight: round ? Style.space(26) : Math.max(Style.space(30), label.implicitHeight + Style.space(12))
+  radius: round ? height / 2 : Style.cornerRadius
   color: primary ? (mouse.containsMouse ? Qt.darker(Commons.Color.accent, 1.15) : Commons.Color.accent)
     : (mouse.containsMouse ? Util.alpha(foreground, 0.12) : Util.alpha(foreground, 0.05))
   border.width: 1
@@ -27,8 +29,9 @@ Rectangle {
     textFormat: Text.PlainText
     text: root.text
     color: root.primary ? Commons.Color.background : (root.warn ? Commons.Color.urgent : root.foreground)
-    font.family: Style.font.family
+    font.family: root.round ? "serif" : Style.font.family
     font.pixelSize: Style.font.body
+    font.bold: root.round
   }
 
   MouseArea {

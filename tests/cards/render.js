@@ -11,5 +11,6 @@ const read = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir, f),
 const t = read("test.json") || {};
 const m = mod.exports.cardModel({ request: read("request.json"), review: read("review.json"), card: read("kind/card.json"),
   pendingIndex: t.pendingIndex || 0, pendingTotal: t.pendingTotal || 1, agent: t.agent, human: t.human });
+if (t.details) m.detailsOpen = true;   // the card after a click on (i)
 fs.writeFileSync(out + ".json", JSON.stringify(m, null, 2) + "\n");
 fs.writeFileSync(out + ".txt", mod.exports.cardText(m));

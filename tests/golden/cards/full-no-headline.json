@@ -1,0 +1,58 @@
+{
+  "id": "20261029T113000-91bc",
+  "kind": "change",
+  "form": "full",
+  "title": "Approve a change to this computer",
+  "pendingText": "1 of 2 pending",
+  "banner": {
+    "icon": "⛉",
+    "quote": "“make my laptop last longer on battery”",
+    "packages": "+1 pkgs",
+    "reviewer": "Reviewer: look closer"
+  },
+  "requestHeading": "YOUR REQUEST (as ada relayed it)",
+  "requestText": "make my laptop last longer on battery",
+  "changes": [
+    {
+      "label": "Packages",
+      "text": "+1 (tlp 1.7.0) · 0 removed · 0 upgraded"
+    },
+    {
+      "label": "Files",
+      "text": "configuration.nix, modules/power.nix"
+    },
+    {
+      "label": "Build",
+      "text": "ok"
+    }
+  ],
+  "review": {
+    "state": "ok",
+    "heading": "AI REVIEW · can be wrong",
+    "headline": "Enables TLP and lowers the screen refresh rate. It also turns Bluetooth off at boot, which you did not ask for.",
+    "hasHeadline": false,
+    "badge": "MEDIUM",
+    "summary": "Enables TLP and lowers the screen refresh rate. It also turns Bluetooth off at boot, which you did not ask for.",
+    "risk": "medium",
+    "recommendation": "ask",
+    "recWord": "LOOK CLOSER",
+    "notes": [
+      "modules/power.nix line 9 sets hardware.bluetooth.powerOnBoot = false; the request doesn't mention Bluetooth"
+    ],
+    "notShown": [],
+    "reason": ""
+  },
+  "buttons": [
+    {
+      "id": "diff",
+      "label": "Show git diff"
+    },
+    {
+      "id": "nvd",
+      "label": "nvd diff"
+    }
+  ],
+  "approveLabel": "Approve",
+  "denyLabel": "Deny",
+  "detailsOpen": false
+}

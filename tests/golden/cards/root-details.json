@@ -1,0 +1,52 @@
+{
+  "id": "20261029T120200-c41d",
+  "kind": "root",
+  "form": "root",
+  "title": "ada wants to run a command as root",
+  "pendingText": "",
+  "requestHeading": "ADA'S STATED REASON",
+  "requestText": "“wifi keeps dropping; reset the driver and NetworkManager”",
+  "command": {
+    "display": "bash fix-wifi.sh",
+    "argv": [
+      "bash",
+      "fix-wifi.sh"
+    ],
+    "runAs": "root",
+    "snapshots": [
+      {
+        "path": "/agents/ada/scratch/fix-wifi.sh",
+        "snapshot": "snapshots/0/fix-wifi.sh",
+        "sha256": "7077deb9bc1e5ed00884682227f41d84d8e8f27e430662ea3c9b81e79181b86b",
+        "executed": true,
+        "label": "/agents/ada/scratch/fix-wifi.sh  (runs; the snapshot is what runs)"
+      }
+    ],
+    "decrypt": [],
+    "notSnapshotted": [
+      "Whether iwlwifi is the driver in use here."
+    ]
+  },
+  "review": {
+    "state": "ok",
+    "heading": "AI REVIEW · can be wrong",
+    "headline": "Restarts Wi-Fi, but line 9 also deletes every saved network.",
+    "hasHeadline": true,
+    "badge": "MEDIUM",
+    "summary": "Restarts NetworkManager and reloads the iwlwifi driver with power saving off until reboot, as the reason says. Line 9 also deletes every saved Wi-Fi network, which the reason doesn't mention.",
+    "risk": "medium",
+    "recommendation": "ask",
+    "recWord": "LOOK CLOSER",
+    "notes": [
+      "Line 9 deletes every saved Wi-Fi network and its password, which the reason doesn't mention."
+    ],
+    "notShown": [
+      "Whether iwlwifi is the driver in use here."
+    ],
+    "reason": ""
+  },
+  "buttons": [],
+  "approveLabel": "Approve",
+  "denyLabel": "Deny",
+  "detailsOpen": true
+}

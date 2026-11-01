@@ -796,14 +796,14 @@ OMANIX-CFG/
 | # | Partition | Format | Contents |
 |---|---|---|---|
 | 1 | ESP | vfat 512 MiB | systemd-boot + installer UKI (installer only; the installed system uses Limine by default, or lanzaboote, D7) |
-| 2 | STORE | erofs zstd + dm-verity | Installer closure: `minimal` + `perlless` where possible, `all-hardware`, full `linux-firmware`, nix, disko, cryptsetup, sbctl, tpm2-tools, age, age-plugin-tpm/-tag, age-plugin-yubikey, sops, git, gum, loom-installer, flavor probes. Includes the release cache public key. |
+| 2 | STORE | erofs zstd + dm-verity | Installer closure: `minimal` + `perlless` where possible, `all-hardware`, linux-firmware (offline: the full set, shared with CACHE's reference closures; net: loom's per-driver keep list, `loom.installer.firmware`), nix, disko, cryptsetup, sbctl, tpm2-tools, age, age-plugin-tpm/-tag, age-plugin-yubikey, sops, git, gum, loom-installer, flavor probes. Includes the release cache public key. |
 | 3 | CACHE | erofs, uncompressed (the content is already `.nar.zst`), + dm-verity | Release `file://` cache: closures of `ref-default`, `ref-nvidia` and `ref-laptop`, plus `nix flake archive` of omanix and all inputs, signed `omanix-cache-1`. **Absent in the `net` variant.** |
 | 4 | OMANIX-CFG | vfat 256 MiB (flash-usb grows it) | sidecar |
 
 - **Verity is corruption detection, not authenticity.** The root hashes sit on the unsigned ESP cmdline. Authenticity comes from `SHA256SUMS.sig` over the image file, which `flash-usb` verifies, plus the readback hash after writing. On a verity error the installer says "This USB stick is damaged. Re-flash it."
 - The installer is not Secure Boot-signed. To boot it, the user disables Secure Boot or puts the firmware in **Setup Mode**. Setup Mode is also what enables the TPM2-automatic option (§e.6).
 - Size checks:
-  - `checks.closure-budget`: offline image ≤ 3.5 GiB (the bar is omarchy's ~6 GB), net image ≤ 200 MB;
+  - `checks.closure-budget`: offline image ≤ 6 GiB (the bar is omarchy's ~6 GB), net image ≤ 2 GiB, both the `.raw` a release ships (it also prints the `.raw.zst` size); measured 5.41 and 1.74 GiB (2026-10-31);
   - `system.forbiddenDependenciesRegexes` (`-doc$`, `texlive`, `ghc-`);
   - `checks.closure-dupes`: no second Mesa, LLVM or Python major.
 - The installed store is the `@nix` subvolume (`compress=zstd,noatime`) with `auto-optimise-store`.

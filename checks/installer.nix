@@ -13,11 +13,26 @@ let
   net = installer.system { variant = "net"; };
 
   # §e.1 closure budgets. Image sizes are the .raw files a release ships
-  # (what flash-usb writes); docs: what stays of /share/doc outputs that a
-  # program references at runtime (git, mpv), see hosts/budget.nix.
+  # (omanix-release copies the .raw into the release; flash-usb writes it);
+  # the check also prints each as .raw.zst (a smaller download, if a release
+  # ever publishes that) and as allocated on disk. docs: what stays of
+  # /share/doc outputs that a program references at runtime (git, mpv), see
+  # hosts/budget.nix.
+  #
+  # Measured 2026-10-31 (nixos-unstable 31ecbac, linux-firmware 20261019):
+  #   offline 5.41 GiB raw (4.22 GiB .zst): ESP 512 MiB + STORE + CACHE
+  #     2.68 GiB + CFG 256 MiB. The live store keeps the whole firmware set,
+  #     shared with the reference closures in CACHE, so the live-system cuts
+  #     mostly move paths into CACHE (5.49 → 5.41 GiB). Budget 6 GiB, Josh's
+  #     bar (omarchy's ISO is ~6 GB): ~10% headroom.
+  #   net 1.74 GiB raw (0.73 GiB .zst): ESP + CFG are 768 MiB of it, the
+  #     STORE ~1 GiB (closure 1.36 GiB NAR, firmware 224 MiB of that, from
+  #     loom.lib.installerFirmware.net). Was 2.48 GiB raw before the
+  #     per-driver firmware and the doc/ModemManager/systemd cuts. Budget
+  #     2 GiB: ~15% headroom.
   budget = {
-    offlineImage = 3.5 * 1024 * 1024 * 1024;   # 3.5 GiB (omarchy's ISO is ~6 GB)
-    netImage = 200 * 1000 * 1000;              # 200 MB
+    offlineImage = 6 * 1024 * 1024 * 1024;     # 6 GiB
+    netImage = 2 * 1024 * 1024 * 1024;         # 2 GiB
     docOutputs = 32 * 1024 * 1024;             # 32 MiB over the reference closures
   };
 
@@ -73,10 +88,10 @@ in
     touch $out
   '';
 
-  # §e.1: the offline image (CACHE included) ≤ 3.5 GiB, the net image
-  # ≤ 200 MB, the doc outputs of the reference closures capped. Prints the
+  # §e.1: the offline image (CACHE included) ≤ 6 GiB, the net image
+  # ≤ 2 GiB, the doc outputs of the reference closures capped. Prints the
   # numbers either way (they are the report to Josh when a budget breaks).
-  closure-budget = pkgs.runCommand "omanix-check-closure-budget" { nativeBuildInputs = [ py ]; } ''
+  closure-budget = pkgs.runCommand "omanix-check-closure-budget" { nativeBuildInputs = [ py pkgs.zstd ]; } ''
     python3 -I ${./installer/closure.py} budget \
       --budget ${builtins.toFile "budget.json" (builtins.toJSON budget)} \
       --image offline=${offline.config.system.build.image} \

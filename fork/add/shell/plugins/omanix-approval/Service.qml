@@ -56,7 +56,74 @@ Item {
   // Reset only for another request: reloading this one (the review landing)
   // updates the card in place, keeping an open reason field or details.
   readonly property string currentId: current ? current.id : ""
-  onCurrentIdChanged: { expanded = false; engaged = false; denyOpen = false; detailPanel = ""; detailText = "" }
+  onCurrentIdChanged: { expanded = false; engaged = false; denyOpen = false; detailPanel = ""; detailText = ""; arm() }
+
+  // The typing guard (as nuketown's card): keys in the card's first second
+  // are dropped, and Approve takes clicks after half a second.
+  property bool keysArmed: false
+  property bool approveArmed: false
+  function arm() { keysArmed = false; approveArmed = false; keysTimer.restart(); approveTimer.restart() }
+  onCardShownChanged: if (cardShown) arm()
+  onBannerShownChanged: if (bannerShown) arm()
+  Timer { id: keysTimer; interval: 1000; onTriggered: root.keysArmed = true }
+  Timer { id: approveTimer; interval: 500; onTriggered: root.approveArmed = true }
+
+  // Esc in the reason field: the agent learns the human stopped it on purpose.
+  readonly property string dismissed: "aborted by the human (dismissed without a reason)"
+
+  function openDeny() {
+    engaged = true; denyOpen = true; reasonField.text = ""; reasonField.forceActiveFocus()
+  }
+
+  // The card's keys (once it has the keyboard, U13): Ctrl+Enter approves;
+  // Esc opens the reason, and in the reason denies as dismissed (Esc Esc);
+  // Enter there denies with what was typed; Ctrl+I toggles the details.
+  // Ctrl+C is the focused text's. No single-letter keys.
+  function cardKey(event, inReason) {
+    if (!keysArmed) { event.accepted = true; return }
+    var ctrl = (event.modifiers & Qt.ControlModifier) !== 0
+    if (event.key === Qt.Key_Escape && !ctrl) {
+      event.accepted = true
+      if (inReason || denyOpen) decide("deny", dismissed)
+      else openDeny()
+    } else if (ctrl && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+      event.accepted = true
+      if (approveArmed) decide("approve", "")
+    } else if (ctrl && event.key === Qt.Key_I) {
+      event.accepted = true
+      showDetail("info")
+    }
+  }
+
+  // The theme's colors.toml, for the risk badge (CardModel.badgeStyle).
+  property var themePalette: ({})
+  FileView {
+    id: paletteFile
+    path: Commons.Color.currentThemePath + "/colors.toml"
+    printErrors: false
+    onLoaded: root.themePalette = CardModel.parsePalette(text())
+    onLoadFailed: root.themePalette = ({})
+  }
+  // A theme switch reaches the shell over IPC: re-read with it.
+  Connections {
+    target: Commons.Color
+    function onAccentChanged() { paletteFile.reload() }
+    function onUrgentChanged() { paletteFile.reload() }
+  }
+  readonly property var badge: {
+    var p = {}
+    for (var k in themePalette) p[k] = themePalette[k]
+    p.urgent = String(Commons.Color.urgent)
+    return CardModel.badgeStyle(model ? model.review.risk : "", p)
+  }
+
+  // Selectable plain text (Ctrl+C copies the selection).
+  component SelectableText: TextEdit {
+    readOnly: true
+    selectByMouse: true
+    textFormat: TextEdit.PlainText
+    selectionColor: Util.alpha(Commons.Color.accent, 0.45)
+  }
   onModelChanged: if (model && model.detailsOpen && detailPanel === "" && current) showDetail("info")
 
   function register(name, item, win) {
@@ -215,7 +282,8 @@ Item {
         engaged: root.engaged, pinentry: root.pinentryUp, detail: root.detailPanel, denyOpen: root.denyOpen,
         approveLabel: root.model ? root.model.approveLabel : "",
         review: root.model ? root.model.review.state : "", headline: root.model ? root.model.review.headline : "",
-        reason: reasonField.text })
+        reason: reasonField.text, armed: root.keysArmed && root.approveArmed,
+        badge: root.badge })
     }
     // Screen coordinates of a named control's center (VM tests drive clicks).
     function geometry(name: string): string {
@@ -275,7 +343,7 @@ Item {
             + (root.model.banner.packages ? "  ·  " + root.model.banner.packages : "") + "  ·  " + root.model.banner.reviewer : ""
         }
         CardButton { id: bDetails; text: "Details"; onClicked: root.expanded = true; Component.onCompleted: root.register("banner.details", bDetails, "banner") }
-        CardButton { id: bApprove; text: root.model ? root.model.approveLabel : "Approve"; primary: true; onClicked: root.decide("approve", ""); Component.onCompleted: root.register("banner.approve", bApprove, "banner") }
+        CardButton { id: bApprove; text: root.model ? root.model.approveLabel : "Approve"; primary: true; onClicked: if (root.approveArmed) root.decide("approve", ""); Component.onCompleted: root.register("banner.approve", bApprove, "banner") }
         CardButton { id: bDeny; text: "✕"; onClicked: root.decide("deny", ""); Component.onCompleted: root.register("banner.deny", bDeny, "banner") }
       }
     }
@@ -306,7 +374,7 @@ Item {
       border.color: Commons.Color.popups.border
       focus: true
 
-      Keys.onEscapePressed: { root.denyOpen = false; root.engaged = false }
+      Keys.onPressed: function(event) { root.cardKey(event, false) }
 
       Flickable {
         id: cardFlick
@@ -344,15 +412,13 @@ Item {
           }
 
           // A root card's command, as the reviewer and the details see it.
-          Text {
+          SelectableText {
             visible: !!root.model && root.model.kind === "root"
             width: parent.width
             leftPadding: Style.space(12)
-            maximumLineCount: 3
-            elide: Text.ElideRight
-            wrapMode: Text.WrapAnywhere
-            textFormat: Text.PlainText
+            wrapMode: TextEdit.WrapAnywhere
             text: root.model && root.model.command ? root.model.command.display : ""
+            selectedTextColor: root.fg
             color: root.fg
             font.family: root.mono
             font.pixelSize: Style.font.body
@@ -366,10 +432,12 @@ Item {
             font.pixelSize: Style.font.caption
             font.bold: true
           }
-          Text {
+          SelectableText {
+            id: requestTextItem
             width: parent.width
-            wrapMode: Text.Wrap
-            textFormat: Text.PlainText
+            wrapMode: TextEdit.Wrap
+            selectedTextColor: root.fg
+            Component.onCompleted: root.register("card.requestText", requestTextItem, "card")
             text: root.model ? root.model.requestText : ""
             color: root.fg
             font.family: root.mono
@@ -439,15 +507,13 @@ Item {
                   width: visible ? badgeText.implicitWidth + Style.space(12) : 0
                   height: badgeText.implicitHeight + Style.space(4)
                   radius: Style.space(4)
-                  color: reviewLine.risk === "high" ? Commons.Color.urgent
-                    : reviewLine.risk === "medium" ? "#b7791f"
-                    : reviewLine.risk === "low" ? "#3f7f4f" : Commons.Color.muted
+                  color: root.badge.background
                   Text {
                     id: badgeText
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
                     text: root.model ? root.model.review.badge : ""
-                    color: "#ffffff"
+                    color: root.badge.text
                     font.family: root.mono
                     font.pixelSize: Style.font.caption
                     font.bold: true
@@ -460,12 +526,12 @@ Item {
                   width: visible ? Style.space(20) : 0
                   height: Style.space(20)
                 }
-                Text {
+                SelectableText {
                   id: headlineText
+                  selectedTextColor: root.fg
                   x: (riskBadge.visible ? riskBadge.width : 0) + (busy.visible ? busy.width : 0) + Style.space(8)
                   width: parent.width - x
-                  wrapMode: Text.Wrap
-                  textFormat: Text.PlainText
+                  wrapMode: TextEdit.Wrap
                   text: root.model ? (root.model.review.state === "ok" ? root.model.review.recWord + " · " : "") + root.model.review.headline : ""
                   color: root.fg
                   font.pixelSize: Style.font.body
@@ -474,12 +540,12 @@ Item {
               }
               Repeater {
                 model: root.model ? root.model.review.notes : []
-                Text {
+                SelectableText {
                   required property var modelData
                   width: reviewColumn.width
                   leftPadding: Style.space(12)
-                  wrapMode: Text.Wrap
-                  textFormat: Text.PlainText
+                  wrapMode: TextEdit.Wrap
+                  selectedTextColor: root.fg
                   text: "• " + modelData
                   color: root.fg
                   font.italic: true
@@ -499,7 +565,7 @@ Item {
               text: "i"
               round: true
               ToolTip.visible: hovered
-              ToolTip.text: "Details"
+              ToolTip.text: "Details (Ctrl+I)"
               onClicked: root.showDetail("info")
               Component.onCompleted: root.register("card.info", infoButton, "card")
             }
@@ -518,11 +584,11 @@ Item {
               Column {
                 id: detailBody
                 spacing: 0
-                Text {
+                SelectableText {
                   visible: root.detailPanel === "info" && !!root.model && root.model.review.state !== "none"
                   width: cardColumn.width - Style.space(24)
-                  wrapMode: Text.Wrap
-                  textFormat: Text.PlainText
+                  wrapMode: TextEdit.Wrap
+                  selectedTextColor: root.fg
                   text: root.model
                     ? root.model.review.summary + (root.model.review.state === "ok" ? "\nCan't see: " + CardModel.cantSee(root.model.review.notShown) : "") + "\n"
                     : ""
@@ -530,9 +596,9 @@ Item {
                   font.italic: true
                   font.pixelSize: Style.font.body
                 }
-                Text {
+                SelectableText {
                   visible: root.detailPanel === "info" && !!root.model && !!root.model.command
-                  textFormat: Text.PlainText
+                  selectedTextColor: root.fg
                   text: root.model && root.model.command
                     ? "runs as " + root.model.command.runAs + ":\n" + root.model.command.argv.map(function(a, i) { return "  argv[" + i + "] " + a }).join("\n")
                       + (root.model.command.decrypt.length ? "\nalso decrypts: " + root.model.command.decrypt.join(", ") : "") + "\n"
@@ -559,7 +625,7 @@ Item {
           }
 
           // Deny's optional reason, in the card: Enter (or Deny again) sends
-          // it, Escape goes back and hands the keyboard back.
+          // it (empty is fine); Esc denies as dismissed.
           Column {
             visible: root.denyOpen
             width: parent.width
@@ -572,11 +638,14 @@ Item {
               color: root.fg
               font.family: root.mono
               onAccepted: root.decide("deny", text)
+              // Before the field's own handling: Esc dismisses, Ctrl+Enter
+              // approves rather than sending the reason.
+              Keys.onPressed: function(event) { root.cardKey(event, true) }
               Component.onCompleted: root.register("card.reason", reasonField, "card")
             }
             Text {
               textFormat: Text.PlainText
-              text: "Enter denies with this reason · Escape goes back"
+              text: "Enter denies with this reason · Esc dismisses"
               color: Util.alpha(root.fg, 0.6)
               font.pixelSize: Style.font.caption
             }
@@ -608,8 +677,10 @@ Item {
                 warn: root.denyOpen
                 onClicked: {
                   if (root.denyOpen) { root.decide("deny", reasonField.text); return }
-                  root.engaged = true; root.denyOpen = true; reasonField.text = ""; reasonField.forceActiveFocus()
+                  root.openDeny()
                 }
+                ToolTip.visible: hovered
+                ToolTip.text: "Deny (Esc)"
                 Component.onCompleted: root.register("card.deny", cDeny, "card")
               }
               CardButton {
@@ -617,7 +688,9 @@ Item {
                 primary: true
                 warn: !!root.model && root.model.approveLabel !== "Approve"
                 id: cApprove
-                onClicked: root.decide("approve", "")
+                onClicked: if (root.approveArmed) root.decide("approve", "")
+                ToolTip.visible: hovered
+                ToolTip.text: "Approve (Ctrl+Enter)"
                 Component.onCompleted: root.register("card.approve", cApprove, "card")
               }
             }

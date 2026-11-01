@@ -8,9 +8,12 @@
 #   approval-card    omanix-approval-prompt (as nuketown's prompter) draws a
 #                    root-command card and change cards from fixture request
 #                    directories (screenshots); the broker answers APPROVED
-#                    and DENIED:<reason>; with no shell it falls back to zenity.
+#                    and DENIED:<reason>; the keys (Ctrl+I, Ctrl+C, Esc,
+#                    Ctrl+Enter); with no shell it falls back to nuketown's
+#                    card, where Esc Esc dismisses.
 #   approval-focus   U13: a card over a fullscreen terminal takes the keyboard
-#                    only on a click and gives it back; it stands aside while
+#                    only on a click and gives it back (deciding, or Esc Esc
+#                    dismissing); it stands aside while
 #                    a pinentry window is up.
 #   desktop-intents  a menu intent row pre-fills the chat composer and sends
 #                    nothing until Enter (screenshot); the bar shows the
@@ -186,6 +189,32 @@ pkgs.testers.runNixOSTest {
             click("card.approve")
             assert answer("w18-root") == "APPROVED"
 
+        with subtest("keys: Ctrl+I toggles details, Ctrl+C copies, Esc opens the reason, Ctrl+Enter approves"):
+            fixture("root-command", "w18-keys")
+            request("w18-keys")
+            machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval state") + " | grep -q '\"armed\":true'", timeout=30)
+            s = state("omanix.approval")
+            assert s["badge"]["contrast"] >= 4.5, s["badge"]
+            click("card.requestText")     # into the card: it takes the keyboard
+            machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval state") + " | grep -q '\"engaged\":true'", timeout=10)
+            machine.send_key("ctrl-i")
+            machine.sleep(1)
+            assert state("omanix.approval")["detail"] == "info", state("omanix.approval")
+            machine.send_key("ctrl-i")
+            machine.sleep(1)
+            assert state("omanix.approval")["detail"] == "", state("omanix.approval")
+            machine.send_key("ctrl-a")
+            machine.send_key("ctrl-c")
+            machine.sleep(1)
+            copied = machine.succeed("su - ${user} -c " + json.dumps("${env} WAYLAND_DISPLAY=$(basename $(ls /run/user/${uid}/wayland-? | head -1)) wl-paste -n"))
+            assert "wifi keeps dropping" in copied, copied
+            machine.send_key("esc")
+            machine.sleep(1)
+            s = state("omanix.approval")
+            assert s["denyOpen"] is True and s["current"] == "w18-keys", s
+            machine.send_key("ctrl-ret")
+            assert answer("w18-keys") == "APPROVED", answer("w18-keys")
+
         with subtest("the review lands while the card is open: updated in place, the reason being typed kept"):
             d = fixture("root-pending", "w18-pending")
             request("w18-pending")
@@ -205,7 +234,7 @@ pkgs.testers.runNixOSTest {
             machine.send_chars(" I'm on a call\n")
             assert answer("w18-pending") == "DENIED:not while I'm on a call", answer("w18-pending")
 
-        with subtest("full change card: Deny with reason -> DENIED:<reason>"):
+        with subtest("full change card: Deny, a reason in the card -> DENIED:<reason>"):
             fixture("full", "w18-full")
             request("w18-full")
             try:
@@ -233,21 +262,23 @@ pkgs.testers.runNixOSTest {
             click("banner.approve")
             assert answer("w18-routine") == "APPROVED"
 
-        with subtest("no shell: the prompter falls back to zenity"):
+        with subtest("no shell: the prompter falls back to nuketown's card (Wayland); Esc Esc dismisses"):
             # omarchy-launch-shell relaunches a shell that exits: stop it first.
             machine.succeed("pkill -u ${user} -f omarchy-launch-shell || true")
             machine.succeed("pkill -u ${user} -f 'quickshell .*-p /run/current-system/omarchy/shell' || true")
             machine.wait_until_fails("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval ping"), timeout=30)
-            fixture("root-command", "w18-zenity")
-            request("w18-zenity")
+            fixture("root-command", "w18-fallback")
+            request("w18-fallback")
             try:
-                machine.wait_until_succeeds("pgrep -u ${user} -f 'zenity --question'", timeout=30)
+                machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} hyprctl -i 0 -j clients") + " | grep -q nuketown-prompter", timeout=30)
             except Exception:
-                print(machine.execute("cat /tmp/answer-w18-zenity; ps -u ${user} -o pid,args | grep -i 'zenity\\|prompt'")[1]); dump(); raise
-            machine.sleep(2)
-            machine.screenshot("fallback-zenity")
-            machine.succeed("pkill -u ${user} -f 'zenity --question'")
-            assert answer("w18-zenity").startswith("DENIED"), answer("w18-zenity")
+                print(machine.execute("cat /tmp/answer-w18-fallback; ps -u ${user} -o pid,args | grep -i 'prompt'")[1]); dump(); raise
+            machine.sleep(2)    # past the card's typing guard
+            machine.screenshot("fallback-card")
+            machine.send_key("esc")
+            machine.sleep(1)
+            machine.send_key("esc")
+            assert answer("w18-fallback") == "DENIED:aborted by the human (dismissed without a reason)", answer("w18-fallback")
       '';
 
       approval-focus = ''
@@ -296,18 +327,22 @@ pkgs.testers.runNixOSTest {
             machine.send_chars("three\n")
             machine.wait_until_succeeds("grep -qx three /tmp/typed", timeout=10)
 
-        with subtest("Escape hands the keyboard back without deciding"):
+        with subtest("Esc opens the reason; Esc again dismisses and hands the keyboard back"):
             fixture("root-command", "w18-escape")
             request("w18-escape")
-            machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval state") + " | grep -q '\"shown\":\"card\"'", timeout=30)
-            click("card.deny")
+            machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval state") + " | grep -q '\"armed\":true'", timeout=30)
+            click("card.requestText")
+            machine.sleep(1)
+            assert state("omanix.approval")["engaged"] is True
             machine.send_key("esc")
             machine.sleep(1)
-            assert state("omanix.approval")["engaged"] is False
+            assert state("omanix.approval")["denyOpen"] is True
+            machine.send_key("esc")
+            machine.wait_until_succeeds("test -s /tmp/answer-w18-escape", timeout=20)
+            assert machine.succeed("cat /tmp/answer-w18-escape").strip() == "DENIED:aborted by the human (dismissed without a reason)"
+            machine.sleep(1)
             machine.send_chars("four\n")
             machine.wait_until_succeeds("grep -qx four /tmp/typed", timeout=10)
-            click("card.approve")
-            machine.wait_until_succeeds("test -s /tmp/answer-w18-escape", timeout=20)
 
         with subtest("a pinentry window keeps the card away until it closes"):
             machine.succeed("su - ${user} -c " + json.dumps("${env} WAYLAND_DISPLAY=$(basename $(ls /run/user/${uid}/wayland-? | head -1)) setsid foot --app-id=pinentry-qt sh -c 'cat > /tmp/pin' >/dev/null 2>&1 &"))

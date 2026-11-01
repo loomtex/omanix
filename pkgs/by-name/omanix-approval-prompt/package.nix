@@ -4,7 +4,8 @@
 # draws the card, and waits for the decision the plugin writes under
 # $XDG_RUNTIME_DIR/omanix-approval/<id>/. Exit 0 approves; otherwise the first
 # line of stdout is the reason the requester sees. With no shell (or no
-# plugin) it asks with zenity instead, rendered by nuketown's own jq renderer.
+# plugin) it hands the request to nuketown's own approval card
+# (nuketown.approvalDaemon.cardPrompter) instead.
 {
   lib,
   writeShellApplication,
@@ -13,14 +14,13 @@
   gnused,
   jq,
   socat,
-  zenity,
   quickshell-omarchy,
-  renderer ? null, # nuketown.approvalDaemon.renderer (jq program)
+  card ? null, # nuketown.approvalDaemon.cardPrompter (package)
 }:
 
 writeShellApplication {
   name = "omanix-approval-prompt";
-  runtimeInputs = [ coreutils gnugrep gnused jq socat zenity quickshell-omarchy ];
+  runtimeInputs = [ coreutils gnugrep gnused jq socat quickshell-omarchy ];
   text = ''
     dir=''${1:?usage: omanix-approval-prompt <request dir>}
     dir=''${dir%/}
@@ -68,52 +68,22 @@ writeShellApplication {
       trap - TERM INT HUP
     fi
 
-    # ---- fallback: zenity (no shell, or the plugin isn't loaded) ---------
-    ${if renderer == null then ''
-      text="<b>$(jq -r '.requester' "$dir/request.json" | sed 's/&/\&amp;/g; s/</\&lt;/g')</b> asks to run:\n\n<tt>$(jq -r '.display' "$dir/request.json" | head -c 800 | sed 's/&/\&amp;/g; s/</\&lt;/g')</tt>"
-    '' else ''
-      text=$(jq -rn --slurpfile req "$dir/request.json" --slurpfile rev <(cat "$dir/review.json" 2>/dev/null || true) -f ${renderer}) || exit 1
-    ''}
-    [[ -n ''${NUKETOWN_PROMPT_NOTE-} ]] && text+="\n\n$NUKETOWN_PROMPT_NOTE"
-    files=$(mktemp)
-    zpid=""
-    trap 'rm -f "$files"; [[ -n $zpid ]] && kill "$zpid" 2>/dev/null; exit 1' TERM INT HUP
-    while IFS= read -r -d "" path && IFS= read -r -d "" snap && IFS= read -r -d "" sha; do
-      [[ $snap == snapshots/* && $snap != *..* ]] || continue
-      {
-        printf '==== %s\n==== sha256 %s\n\n' "$path" "$sha"
-        head -c 1048576 "$dir/$snap" | cat -n
-        printf '\n'
-      } >> "$files"
-    done < <(jq -j '.snapshots[] | .path, "\u0000", .snapshot, "\u0000", .sha256, "\u0000"' "$dir/request.json")
-    for f in "$dir"/kind/{card.json,stat.txt,nvd.txt,diff.txt}; do
-      [[ -f $f ]] || continue
-      {
-        printf '==== %s\n\n' "''${f#"$dir"/}"
-        head -c 204800 "$f"
-        printf '\n\n'
-      } >> "$files"
-    done
-    extra=(--extra-button "Deny with reason")
-    [[ -s $files ]] && extra+=(--extra-button "Show files")
-    topt=()
-    (( timeout > 0 )) && topt=(--timeout="$timeout")
-    outf=$(mktemp)
-    while :; do
-      zenity --question --title="omanix: approve?" --text="$text" --ok-label=Approve --cancel-label=Deny \
-        --default-cancel --width=640 "''${topt[@]}" "''${extra[@]}" > "$outf" 2>/dev/null & zpid=$!
-      rc=0; wait "$zpid" || rc=$?; zpid=""
-      [[ $rc == 0 ]] && { rm -f "$files" "$outf"; exit 0; }
-      case "$(cat "$outf")" in
-        "Show files") zenity --text-info --title="omanix: files in this request" --filename="$files" --width=900 --height=700 2>/dev/null; continue ;;
-        "Deny with reason")
-          zenity --entry --title="omanix: deny" --text="Reason (shown to the requester):" --width=500 2>/dev/null | head -c 500
-          rm -f "$files"; exit 1 ;;
-      esac
-      [[ $rc == 5 ]] && echo "no answer within ''${timeout}s"
-      rm -f "$files"
+    # ---- fallback: nuketown's approval card (no shell, or no plugin) -----
+    # Same contract as this prompter (exit 0 approves, the reason on stdout,
+    # "no answer within Ns"); it reads NUKETOWN_PROMPT_NOTE itself. The
+    # broker's environment only has DISPLAY: use the session's Wayland
+    # socket when there is one.
+    ${if card == null then ''
+      echo "no approval card: the shell isn't running"
       exit 1
-    done
+    '' else ''
+      if [[ -z ''${WAYLAND_DISPLAY-} ]]; then
+        for s in "$XDG_RUNTIME_DIR"/wayland-[0-9]*; do
+          [[ -S $s && $s != *.lock ]] && { export WAYLAND_DISPLAY=''${s##*/}; break; }
+        done
+      fi
+      exec ${lib.getExe card} "$dir"
+    ''}
   '';
   meta.description = "nuketown approval prompter that draws the omanix approval card";
 }

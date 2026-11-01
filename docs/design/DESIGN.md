@@ -77,7 +77,7 @@ loom     DE-agnostic platform + agent base: mkHost core, installer image + hostg
          firstboot, catalogs lib, nuketown compatibility glue (§a.3)
    │ inputs.nuketown   (v1 changes K1–K10, §a.3)
 nuketown agents as unix users (resident ada, reviewer); approval: root wrapper, script snapshots,
-         request kinds, reviewer run, broker + swappable prompter (zenity default)
+         request kinds, reviewer run, broker + swappable prompter (built-in GTK card)
 seed/silo: S3, S4 (v1, test infra only); S1, S2 later
 ```
 
@@ -188,7 +188,7 @@ V7 kept nuketown unchanged; V8 changes its approval path, because every approval
 | K3 | **A request is a directory written by the service user, not a text line.** `nuketown-approve` writes `/run/nuketown-approval/<id>/request.json` (argv as a JSON array, `display` = argv `%q`-quoted on one line, requester from sudo's `SUDO_USER`, run-as, cwd, why, decrypt) and sends the broker only `REQUEST:<id>` (plus `DECRYPT:` lines). `SUDO:`/legacy lines are gone; the broker rejects unknown operations and ids that don't name a request directory. | A newline in an argument could add a second request line, so the dialog showed something other than what ran (confirmed in a VM). The id is chosen by the service user; argv never crosses the socket. | built |
 | K4 | **Script snapshots, read as the requester.** The program (`argv[0]` outside `/nix/store` and `/run/wrappers`), or the first non-option argument after an interpreter (`bash sh dash zsh ksh fish python python3* perl node ruby lua*`; `-c`/`-e`/`-m`/`-` mean inline code, no file), is read with `sudo -u <requester> nuketown-approval-read <path>` (regular file, ≤ `snapshotMaxBytes`, default 1 MiB), stored as `snapshots/<n>/<basename>` with its sha256, and **runs in place of the original**. If it can't be read *by the requester*, the request is refused before asking. Up to 8 other path-like arguments are snapshotted for review only. | Josh: a scratchpad script that does several things in one sudo is hard to audit. What runs is what was reviewed, and the service user never reads a file the agent couldn't. | built |
 | K5 | **Approval reviewer** (`nuketown.approval.reviewer.{enable,agent,command,timeout}`, default off). Before asking, the service user runs `timeout <timeout> sudo -H -u <agent> <command> <request dir>` (default command: `claude -p` with a fixed adversarial prompt and the request inlined; default timeout 45 s), validates the JSON it prints and writes `review.json` (`status`: `ok` \| `unavailable` with a reason \| `disabled`). The service user parses the output, unprivileged; root never sees it. | The review is adversarial and in plain English (§g.4). | built (synchronous; the "card fills in later" mode of rev 5 is W1b) |
-| K6 | **Swappable prompter** (`nuketown.approvalDaemon.prompter`, HM, default null = built-in zenity). The broker runs `<prompter> <request dir>`; exit 0 approves, anything else denies. With a custom prompter a `--decrypt` runs after approval (one YubiKey touch). The built-in zenity prompter renders `request.json`/`review.json` (Pango-escaped) with a **Show files** button (`--extra-button`) for the snapshots; DECRYPT + REQUEST keeps the combined YubiKey dialog. | omanix draws the card in Quickshell; signi keeps zenity. | built (a deny reason on the requester's stderr is W1b) |
+| K6 | **Swappable prompter** (`nuketown.approvalDaemon.prompter`, HM, default null = the built-in GTK card). The broker runs `<prompter> <request dir>`; exit 0 approves, anything else denies. With a custom prompter a `--decrypt` runs after approval (one YubiKey touch). The built-in zenity prompter renders `request.json`/`review.json` (Pango-escaped) with a **Show files** button (`--extra-button`) for the snapshots; DECRYPT + REQUEST keeps the combined YubiKey dialog. | omanix draws the card in Quickshell; signi keeps zenity. | built (a deny reason on the requester's stderr is W1b) |
 | K7 | **Request kinds** (`nuketown.approval.kinds.<name> = { command; collect; reviewPrompt; timeout; }`): a collector runs before the review when the resolved `argv[0]` matches; non-zero refuses with its message. | A switch is a richer request (nvd, git diff) on the same path, with no daemon. | **W1b** |
 | K8 | **Per-agent approval list** (`nuketown.agents.<n>.sudo.approvalAllow`, `nullOr (listOf str)`, default null = any command; entries are absolute paths or names resolved in the system PATH, compared as resolved paths, not realpaths, because coreutils is one binary). Refused before asking. `sudo.commands` is a deprecated alias. | Mino-style: a short list instead of "anything with approval". | built |
 | K9 | The shim accepts `--why <text>`; the card shows it as the agent's stated reason and the reviewer checks the command against it. | The reason is context, not trust. | built |
@@ -1654,7 +1654,7 @@ Rev 3's root-held request ledger, `SO_PEERCRED` attribution, paste and agent-cho
 any root command:
   resident: sudo [--why "…"] <cmd…> ─► nuketown shim ─► sudo -u nuketown-approval nuketown-approve
      approval list (K8) → request dir + snapshots read as the requester (K3, K4) → kind collector, if any (K7, W1b)
-     → reviewer, up to its timeout (K5) → broker REQUEST:<id> → prompter (omanix card | zenity) → Approve / Deny
+     → reviewer, up to its timeout (K5) → broker REQUEST:<id> → prompter (omanix card | nuketown's card) → Approve / Deny
      Approve ─► sudo <exec_argv> (snapshots in place of scripts; logged)    Deny ─► "Request denied." on the resident's stderr
      → journal record + audit copy (K12)
 
@@ -1723,7 +1723,7 @@ loom's switch prompt adds: compare the git diff and the nvd diff with the reques
 
 **Form.** A change card is routine (one line, §h.4) when the reviewer said `approve` with `risk = low` and no `notes`, there are no `flags`, and there is a request; or for an undo or a release-only update. Everything else uses the full form. Root-command cards have one form (§h.4). This is a display choice, not a security property.
 
-**Zenity fallback** (signi, or no Quickshell; built): the built-in prompter shows the requester, run-as user, the quoted command, the agent's stated reason, the snapshotted files, then the reviewer's risk, recommendation, summary, concerns and what it couldn't verify (or "No review: <reason>" / "No reviewer configured"); **Show files** opens the snapshot contents with their sha256. A change card (W1b, kinds) adds title, packages and flags.
+**nuketown's card** (signi, or no Quickshell; built): the built-in prompter (`nuketown-prompter`, GTK 4, X11 and Wayland) shows the requester and run-as user, the command, the agent's stated reason and kind, then the review line (risk badge, recommendation, headline, concerns) or "No review: <reason>" / "No reviewer configured" / a spinner while pending, updated in place; its ⓘ expands the summary, "Could not verify", the snapshotted and kind files (scrollable, monospace) and the full command. Deny and Approve only, the keys of §h.4.
 
 ### g.5 Activation, watchdog, rollback
 
@@ -2065,7 +2065,7 @@ There is no agent tool for screenshots or the clipboard.
 
 ### h.4 Card UI (`omanix.approval`)
 
-`omanix-approval-prompt <request dir>` (K6) calls `qs ipc call omanix.approval show <dir>` and waits for the decision the plugin writes under `$XDG_RUNTIME_DIR/omanix-approval/<id>`; if the plugin isn't running it falls back to nuketown's zenity prompter. A card lives as long as its request (the bar badge counts them); after a shell restart the plugin re-reads the open request directories.
+`omanix-approval-prompt <request dir>` (K6) calls `qs ipc call omanix.approval show <dir>` and waits for the decision the plugin writes under `$XDG_RUNTIME_DIR/omanix-approval/<id>`; if the plugin isn't running it falls back to nuketown's own approval card (`nuketown.approvalDaemon.cardPrompter`, GTK 4, on the session's Wayland socket). A card lives as long as its request (the bar badge counts them); after a shell restart the plugin re-reads the open request directories.
 
 **Change card, routine form** (`kind = loom-switch`). A one-line banner (layer-shell `overlay`, top-right, theme notification tokens, 560 px max):
 
@@ -2080,24 +2080,26 @@ There is no agent tool for screenshots or the clipboard.
 **Change card, full form.** A centered card (layer-shell `overlay`, keyboard focus only after the human clicks into it, U13), 720 px:
 
 ```
-┌─ Approve a change to this computer ───────────────────────────────── 1 of 2 pending ─┐
-│ YOUR REQUEST (as ada relayed it)                                                     │
-│   "make my laptop last longer on battery"                                            │
-├─ WHAT CHANGES ───────────────────────────────────────────────────────────────────────┤
-│ Packages   +1 (tlp 1.7.0) · 0 removed                                                │
-│ Files      configuration.nix, modules/power.nix                                      │
-│ Build      ok                                                                        │
-├─ AI REVIEW · can be wrong ───────────────────────────────────────────────────────────┤
-│ Enables TLP and lowers the screen refresh rate. It also turns Bluetooth off at boot, │
-│ which you did not ask for.   Matches your request: partly.   Recommends: LOOK CLOSER  │
-├──────────────────────────────────────────────────────────────────────────────────────┤
-│ [Show git diff]  [nvd diff]  [Agent's notes]                                         │
-│                                   [Deny with reason…]          [Approve]             │
-└──────────────────────────────────────────────────────────────────────────────────────┘
+┌─ Approve a change to this computer ─────────────────────────────────── 1 of 2 pending ─┐
+│ YOUR REQUEST (as ada relayed it)                                                       │
+│   make my laptop last longer on battery                                                │
+├─ WHAT CHANGES ─────────────────────────────────────────────────────────────────────────┤
+│ Packages   +1 (tlp 1.7.0) · 0 removed · 0 upgraded                                     │
+│ Files      configuration.nix, modules/power.nix                                        │
+│ Build      ok                                                                          │
+├─ AI REVIEW · can be wrong ─────────────────────────────────────────────────────────────┤
+│ [MEDIUM] LOOK CLOSER · Saves battery, but also turns Bluetooth off at every boot.      │
+│   • modules/power.nix line 9 sets hardware.bluetooth.powerOnBoot = false; the request  │
+│   doesn't mention Bluetooth                                                            │
+│                                                                                    (i) │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ [Show git diff]  [nvd diff]             [Deny]   [Approve]                             │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Section order: (1) **Request**, or a line "No request given" / "Scheduled update" / "Your own commit"; (2) **What changes**: packages from nvd, files, the `flags` line (§g.3) in the warning color, build result; (3) **AI review**, or "No AI review (<reason>). Check the diff."; (4) buttons.
-- The AI review is set in proportional italic on a tinted background, header "AI REVIEW · can be wrong", recommendation as a word, not only a color. The rest of the card is monospace and comes from the collector (root).
+(The text form of `tests/golden/cards/full.txt`.) Section order: (1) **Request**, or a line "No request given" / "Scheduled update" / "Your own commit"; (2) **What changes**: packages from nvd, files, the `flags` line (§g.3) in the warning color, build result; (3) **AI review**, or "No AI review (<reason>). Check the diff."; (4) the ⓘ; (5) buttons.
+- The AI review sits on a tinted background under "AI REVIEW · can be wrong": a risk badge (the theme's red/yellow/green for high/medium/low, nearest tokens otherwise, text chosen for at least 4.5:1, `checks.card-badge-contrast`), the recommendation as a word and the reviewer's **headline** (at most 12 words; a review without one leads with its summary), then the concerns as bullets in italic. The rest of the card is monospace and comes from the collector (root).
+- **ⓘ** (`Details (Ctrl+I)`) expands in place: the review's summary and "Can't see". While the review is pending the line is a spinner, "Reviewer is reading this request…", and the card updates in place when review.json lands (an open reason or details stay as they are).
 - If the reviewer recommends deny, Approve is labelled "Approve anyway".
 
 **Show git diff** expands `DiffView.qml`: file list left, unified diff right (syntax-colored for nix/lua/json). "Open in terminal" runs `git -C /persist/var/lib/loom/host diff --stat -p <deployed> refs/proposals/<id>` read-only. **Agent's notes** shows commit bodies, labelled agent-written.
@@ -2105,25 +2107,38 @@ Section order: (1) **Request**, or a line "No request given" / "Scheduled update
 **Root-command card** (every other request). Centered, 720 px, same focus rule:
 
 ```
-┌─ ada wants to run a command as root ──────────────────────────────────────────────────┐
-│ ADA'S STATED REASON                                                                   │
-│   "wifi keeps dropping; reset the driver and NetworkManager"                          │
-├─ AI REVIEW · can be wrong ────────────────────────────────────────────────────────────┤
-│ Runs fix-wifi.sh (snapshot, 14 lines) as root:                                        │
-│  1. restarts NetworkManager (lines 3–4)                                               │
-│  2. reloads the iwlwifi driver with power saving off until reboot (lines 6–7)         │
-│  3. deletes every saved Wi-Fi network (line 9), which the reason doesn't mention      │
-│ Can't see: nothing.  Risk: MEDIUM.  Matches the reason: partly.  Recommends: LOOK CLOSER │
-├───────────────────────────────────────────────────────────────────────────────────────┤
-│ [Show command and script]                        [Deny with reason…]   [Approve]      │
-└───────────────────────────────────────────────────────────────────────────────────────┘
+┌─ ada wants to run a command as root ───────────────────────────────────────────────────┐
+│   bash fix-wifi.sh                                                                     │
+│ ADA'S STATED REASON                                                                    │
+│   “wifi keeps dropping; reset the driver and NetworkManager”                           │
+├─ AI REVIEW · can be wrong ─────────────────────────────────────────────────────────────┤
+│ [MEDIUM] LOOK CLOSER · Restarts Wi-Fi, but line 9 also deletes every saved network.    │
+│   • Line 9 deletes every saved Wi-Fi network and its password, which the reason        │
+│   doesn't mention.                                                                     │
+│                                                                                    (i) │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│                                         [Deny]   [Approve]                             │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Show command and script** expands argv as a list (one argument per line, control characters shown escaped) and every snapshot with line numbers and sha256, marking the one that runs. Files read at run time are listed as "not snapshotted".
-- With no review: header "No AI review (<reason>). Read the command." and the expansion open by default.
+- The command (as displayed) is under the title. **ⓘ** adds to the review's summary and "Can't see" the argv as a list (one argument per line, control characters shown escaped) and every snapshot with line numbers and sha256, marking the one that runs (`tests/golden/cards/root-details.txt`).
+- With no review: header "No AI review (<reason>). Read the command." and the details open by default.
 - A `high` risk or a `deny` recommendation labels the button "Approve anyway".
 
-**Deny with reason**: the reason reaches the resident as Josh's reply on the denied command's stderr. For a change card it is also passed to the reviewer of the next proposal (O7).
+**Deny**: opens an optional reason inside the card. Enter (or Deny again) sends it, empty or not; it reaches the resident as Josh's reply on the denied command's stderr. For a change card it is also passed to the reviewer of the next proposal (O7).
+
+**Keys** (once the card has the keyboard, after a click into it, U13; the same on nuketown's card):
+
+| Key | Action |
+|---|---|
+| Ctrl+Enter | Approve (never a bare Enter; Approve takes no keyboard focus) |
+| Esc on the card | Opens the reason with the focus in it |
+| Enter in the reason | Deny with the reason (empty allowed) |
+| Esc in the reason | Deny with "aborted by the human (dismissed without a reason)", so Esc Esc is a quick deny |
+| Ctrl+I | Toggles the details (ⓘ) |
+| Ctrl+C | Copies selected text |
+
+Tooltips name them: "Approve (Ctrl+Enter)", "Deny (Esc)", "Details (Ctrl+I)". No single-letter keys. A typing guard drops every key in the card's first second and ignores Approve clicks in its first half second. Closing nuketown's card denies with no reason; no answer within the prompt timeout denies with "no answer within Ns".
 
 ### h.5 The menu as an intent launcher
 
@@ -2382,7 +2397,7 @@ The installer test image differs from the release image only in three ways: `loo
 | `sops-host-key` / `sops-tpm-age1tag` | loom | The file backend decrypts, and the resident's ssh key arrives from `secrets/agents.yaml` (C3). The second test settles the UNVERIFIED age1tag round trip and gates the `tpm` backend. |
 | `repo-id-vector` | loom | §d.5 |
 | `pipeline-e2e` | loom | On the S3 stand-in: a replay resident commits and runs `loom propose --request …` → build → `sudo loom-switch` → collector (bundle into the mirror, git diff, nvd) → reviewer (`harness = "replay"`, run as uid 1101) → routine card → test prompter `APPROVED` → switch promoted → `master` pushed with the host key. Variants: `DENIED: keep bluetooth` reaches the resident's stderr and nothing switches; a bundle that doesn't descend from the deployed commit is refused (exit 5) with no dialog; a reviewer stub that prints garbage gives "No AI review" and the full form; the human's `loom propose` goes through `pkexec loom-switch-request` with no review. |
-| `approval-dialog` | loom | With the **real** nuketown broker and the built-in zenity prompter in a Hyprland session (uwsm): a request shows the review above the command, **Show files** shows the snapshot, and clicking Approve (ydotool) runs it (U37, U42). |
+| `approval-dialog` | loom | With the **real** nuketown broker and the built-in prompter (nuketown's GTK card) in a Hyprland session (uwsm): a request shows the review line above the details, ⓘ shows the snapshot, and clicking Approve (ydotool) runs it (U37). nuketown's own `vm-approval-card` drives the card on X11/i3 and Wayland. |
 | `switch-watchdog` | loom | A change → promoted. A commit that breaks the health check → rolled back, boot default unchanged, `gate/rejected/<tip>`. **`loom-switch` killed mid-test → the dead-man timer rolls back.** A proposal that breaks `~/.config/hypr/*.lua` fails `configerrors` inside the watchdog window, after the step-3a reload, and rolls back. |
 | `undo-rollback` | loom | GUI Undo builds from the store and runs on the human's click through polkit `farm.loom.undo` (U43); the resident's `loom undo` is a routine card with no review; a watchdog failure needs none; booting an older generation from the loader yields the "make it the default?" card; `sudo nixos-rebuild switch` outside loom is noted on the next card. |
 | `update-card` | loom | The timer produces a host `update:` commit; a signed omanix tag → routine "Update ready"; an unsigned rev is not taken; a plugin input bump on request → full card; nothing switches without the approval. |
@@ -2400,7 +2415,7 @@ The installer test image differs from the release image only in three ways: `loo
 | `verity-corruption` | loom | A flipped byte gives the "damaged" message. |
 | `desktop-boots` (+ greeter variant) | omanix | SDDM greeter on Hyprland and autologin → uwsm → Hyprland 0.56.2 + omarchy-shell on virtio-gpu. No QML errors (U24), configerrors empty, `OMARCHY_PATH=/run/current-system/omarchy` in the user env. `home-manager-<user>.service` finished before `display-manager.service`; every HM target is a store link; every overlay file exists; the clock's middle-click opens the timezone intent row. Variant `desktop-intents` (W18): a menu intent row pre-fills the chat composer and sends nothing until Enter (screenshot); the bar shows the approval and agent indicators. |
 | `chat-socket`, `approval-focus` | omanix | The QML panel connects to the bridge socket, survives a bridge restart and reconnects (U10). The full card over a fullscreen terminal takes focus only on click and returns focus (U13). |
-| `approval-card` | omanix | `omanix-approval-prompt` draws a root-command card and a change card from fixture request directories (screenshots), returns `DENIED: <reason>` and `APPROVED`, and falls back to zenity when the plugin isn't running. |
+| `approval-card` | omanix | `omanix-approval-prompt` draws a root-command card and a change card from fixture request directories (screenshots), returns `DENIED: <reason>` and `APPROVED`, covers the keys (Ctrl+I, Ctrl+C, Esc, Ctrl+Enter) and a review landing while a reason is typed, and falls back to nuketown's card (Esc Esc dismisses) when the plugin isn't running. |
 | `theme-switch` | omanix | `omarchy-theme-set` works for two themes and kitty, alacritty and foot pick up the colors; lock resets the theme at the next login. No HM target changed. |
 | `writers-respect-hm` | omanix | As rev 3: every KEEP-AS-GUI `writes =` smoke (font set, text size, monitor scale, `omarchy-bar` position, glass on, gaps toggle, `chromium-add-feature`, keyboard layout picker U28, `omanix reset hypr/hyprland.lua`, `reinstall-configs`), then: every HM target is still a link into the current generation; each runtime target changed; configerrors empty; `omanix doctor --json` lists the expected overlays and `omanix set omanix.fonts.monospace …` returns `shadowedBy`; `fc-match monospace` and `omarchy-font-current` return the new font; a panel scale change survives `omarchy-hyprland-monitor-clamshell`; an alacritty overlay key overrides `omanix-base.toml` (U35). |
 | `make-it-stick` | omanix | Change scale and theme in the GUI → snapshot attached and sent → replay resident maps it → card → approval → `settle` removes the matching kv keys and empties the absorbed whole-file overlay; an overlay changed after the snapshot is left and listed by `doctor`. |
@@ -2440,12 +2455,12 @@ Rev 3's U1–U9, U14, U16–U18 concerned dropped machinery and are listed in Ap
 | U34 | SDDM `wayland.compositorCommand` with the Hyprland greeter config works | `desktop-boots` greeter variant; fallback greetd |
 | U35 | foot/kitty with a missing include; GTK4 absolute `@import` honored by libadwaita; `xdg-settings` from activation without a session bus | `desktop-boots`, `writers-respect-hm` |
 | U36 | Offline flake eval during install from archived inputs | `installer-offline-eval` |
-| U37 | nuketown's HM broker unit, restarted by omanix autostart after uwsm imports the session environment, shows zenity on the Hyprland session (it sets only `DISPLAY=:0`) | `approval-dialog`; fallback: a loom drop-in in `/etc/systemd/user/nuketown-broker.service.d/` adding `WAYLAND_DISPLAY` and `After=graphical-session.target` ordering via `PartOf=` |
+| U37 | nuketown's HM broker unit, restarted by omanix autostart after uwsm imports the session environment, shows the built-in card on the Hyprland session (it sets only `DISPLAY=:0`; omanix-approval-prompt's fallback picks up the session's Wayland socket itself) | `approval-dialog`; fallback: a loom drop-in in `/etc/systemd/user/nuketown-broker.service.d/` adding `WAYLAND_DISPLAY` and `After=graphical-session.target` ordering via `PartOf=` |
 | U38 | (rev 4's `\n`-escape claim for the dialog text; moot with K3 request directories) | — |
 | U39 | ~~settled~~ by W1: the shim passes `--why` (`vm-approval-flow`); `SETENV` is gone and agent commands resolve in the system PATH (`vm-sudo-approval-bypass`) | — |
 | U40 | The `unstable = final` alias satisfies `nixosOptionsDoc` for nuketown's `portal.command` default | `catalogs` |
 | U41 | `sudo -H -u reviewer` from the service user lets `claude -p` use the reviewer's persisted login non-interactively, within the 45 s default timeout | manual run with a real login; stub reviewer in CI |
-| U42 | The pinned zenity supports `--extra-button` with `--question` | `approval-dialog` |
+| U42 | (Retired: the zenity prompter is gone; nuketown's card has no extra buttons.) | — |
 | U43 | polkit sees the human's Quickshell (uwsm) session as active and local, for `farm.loom.propose` and `farm.loom.undo` | `undo-rollback`, `human-commit` |
 
 ---

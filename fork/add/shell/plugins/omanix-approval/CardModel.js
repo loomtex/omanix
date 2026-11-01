@@ -65,6 +65,61 @@ function reviewView(review, forRoot) {
     badge: "", summary: "", risk: "", recommendation: "", recWord: "", notes: [], notShown: [], reason: truncate(reason, 300) }
 }
 
+// ---- the risk badge's colours, from the theme (colors.toml) -------------
+
+function hexRgb(c) {
+  var m = /^#?([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(str(c).trim())
+  if (!m) return null
+  var n = parseInt(m[1], 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+// WCAG relative luminance and contrast ratio.
+function luminance(c) {
+  var rgb = hexRgb(c)
+  if (!rgb) return 0
+  var l = rgb.map(function(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) })
+  return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2]
+}
+
+function contrast(a, b) {
+  var x = luminance(a), y = luminance(b)
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
+}
+
+function firstColor() {
+  for (var i = 0; i < arguments.length; i++) if (hexRgb(arguments[i])) return "#" + str(arguments[i]).trim().replace(/^#/, "").slice(0, 6).toLowerCase()
+  return "#707880"
+}
+
+// palette: colors.toml keys (red, yellow, green, color1..3, accent, muted,
+// background, foreground) plus the shell's urgent. The badge is the
+// theme's red/yellow/green for high/medium/low (the nearest tokens when a
+// theme has none); its text is the theme's background or foreground when
+// that reads at 4.5:1, else black or white, whichever reads best (always
+// at least 4.5:1). The word on the badge carries the risk; colour helps.
+function badgeStyle(risk, palette) {
+  var p = palette || {}
+  var bg = risk === "high" ? firstColor(p.urgent, p.red, p.color1, "#c62828")
+    : risk === "medium" ? firstColor(p.yellow, p.color3, p.orange, p.accent, "#b7791f")
+    : risk === "low" ? firstColor(p.green, p.color2, p.accent, "#3f7f4f")
+    : firstColor(p.muted, p.color8, "#707880")
+  var text = null
+  ;[p.background, p.foreground].forEach(function(c) { if (!text && hexRgb(c) && contrast(c, bg) >= 4.5) text = firstColor(c) })
+  if (!text) text = contrast("#000000", bg) >= contrast("#ffffff", bg) ? "#000000" : "#ffffff"
+  return { background: bg, text: text, contrast: Math.round(contrast(text, bg) * 100) / 100 }
+}
+
+// colors.toml text → { key: "#rrggbb" } (only quoted hex values).
+function parsePalette(toml) {
+  var out = {}
+  str(toml).split("\n").forEach(function(line) {
+    var m = /^\s*([a-z0-9_]+)\s*=\s*"(#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?)"/.exec(line)
+    if (m) out[m[1]] = m[2]
+  })
+  return out
+}
+
 // "Can't see: …" in one line, ending with one full stop.
 function cantSee(list) {
   var t = list.length ? list.join("; ") : "nothing"
@@ -247,4 +302,5 @@ function cardText(m) {
 }
 
 // For node (checks.card-goldens); QML ignores this.
-if (typeof module !== "undefined") module.exports = { cardModel: cardModel, cardText: cardText, reviewView: reviewView, escapeArg: escapeArg, cantSee: cantSee }
+if (typeof module !== "undefined") module.exports = { cardModel: cardModel, cardText: cardText, reviewView: reviewView, escapeArg: escapeArg, cantSee: cantSee,
+  badgeStyle: badgeStyle, parsePalette: parsePalette, contrast: contrast }

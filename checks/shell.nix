@@ -58,6 +58,12 @@ in
     touch $out
   '';
 
+  # The risk badge reads at 4.5:1 or better in every theme omarchy ships.
+  card-badge-contrast = pkgs.runCommand "omanix-check-card-badge-contrast" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
+    node ${../tests/cards/badge-contrast.js} ${pkgs.omarchy-src}/shell/plugins/omanix-approval/CardModel.js ${pkgs.omarchy-src}/themes
+    touch $out
+  '';
+
   card-golden-routine = cardGolden "routine";
   card-golden-full = cardGolden "full";
   card-golden-root-command = cardGolden "root-command";

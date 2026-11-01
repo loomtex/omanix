@@ -61,6 +61,9 @@ in
   card-golden-routine = cardGolden "routine";
   card-golden-full = cardGolden "full";
   card-golden-root-command = cardGolden "root-command";
+  card-golden-root-details = cardGolden "root-details";
+  card-golden-root-pending = cardGolden "root-pending";
+  card-golden-full-no-headline = cardGolden "full-no-headline";
 
   # VM tests (§i.2): U10, U13, the card and the intents on the desktop.
   chat-socket = vm "chat-socket";

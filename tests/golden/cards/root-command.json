@@ -23,30 +23,30 @@
       }
     ],
     "decrypt": [],
-    "notSnapshotted": []
+    "notSnapshotted": [
+      "Whether iwlwifi is the driver in use here."
+    ]
   },
   "review": {
     "state": "ok",
     "heading": "AI REVIEW · can be wrong",
-    "summary": "Runs fix-wifi.sh (snapshot, 14 lines) as root.",
+    "headline": "Restarts Wi-Fi, but line 9 also deletes every saved network.",
+    "hasHeadline": true,
+    "badge": "MEDIUM",
+    "summary": "Restarts NetworkManager and reloads the iwlwifi driver with power saving off until reboot, as the reason says. Line 9 also deletes every saved Wi-Fi network, which the reason doesn't mention.",
     "risk": "medium",
     "recommendation": "ask",
     "recWord": "LOOK CLOSER",
     "notes": [
-      "restarts NetworkManager (lines 3-4)",
-      "reloads the iwlwifi driver with power saving off until reboot (lines 6-7)",
-      "deletes every saved Wi-Fi network (line 9), which the reason doesn't mention"
+      "Line 9 deletes every saved Wi-Fi network and its password, which the reason doesn't mention."
     ],
-    "notShown": [],
+    "notShown": [
+      "Whether iwlwifi is the driver in use here."
+    ],
     "reason": ""
   },
-  "buttons": [
-    {
-      "id": "command",
-      "label": "Show command and script"
-    }
-  ],
+  "buttons": [],
   "approveLabel": "Approve",
-  "denyLabel": "Deny with reason…",
+  "denyLabel": "Deny",
   "detailsOpen": false
 }

@@ -1,0 +1,3 @@
+ configuration.nix | 1 +
+ modules/power.nix | 10 ++++++++++
+ 2 files changed, 11 insertions(+)

@@ -1,0 +1,23 @@
+diff --git a/configuration.nix b/configuration.nix
+--- a/configuration.nix
++++ b/configuration.nix
+@@ -3,6 +3,7 @@
+   imports = [
+     ./machine.nix
++    ./modules/power.nix
+   ];
+diff --git a/modules/power.nix b/modules/power.nix
+new file mode 100644
+--- /dev/null
++++ b/modules/power.nix
+@@ -0,0 +1,10 @@
++{ ... }:
++
++{
++  services.tlp.enable = true;
++  services.power-profiles-daemon.enable = false;
++  omanix.hyprland.monitors.eDP-1.refresh = 60;
++
++  # quieter radios on battery
++  hardware.bluetooth.powerOnBoot = false;
++}

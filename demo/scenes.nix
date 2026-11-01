@@ -124,6 +124,7 @@ in
       {
         when = "battery";
         review = {
+          headline = "Saves battery, but also turns Bluetooth off at every boot.";
           summary = "Enables TLP in place of power-profiles-daemon and sets the screen to 60 Hz. It also turns Bluetooth off at every boot, which you didn't ask for.";
           risk = "medium";
           recommendation = "ask";
@@ -161,10 +162,13 @@ in
       (say "Done; it stays that way after a reboot.")
     ];
     reviews = [
-      (review "saved networks untouched" "Runs fix-wifi.sh as root: prints the Wi-Fi radio state, turns power saving off on each Wi-Fi interface until the next boot (iw), restarts NetworkManager and switches the radio on. Saved networks are not touched." { })
+      (review "saved networks untouched" "Runs fix-wifi.sh as root: prints the Wi-Fi radio state, turns power saving off on each Wi-Fi interface until the next boot (iw), restarts NetworkManager and switches the radio on. Saved networks are not touched." {
+        headline = "Restarts Wi-Fi for this boot; saved networks untouched.";
+      })
       {
         when = "power saving off for this boot";
         review = {
+          headline = "Restarts Wi-Fi, but line 9 deletes every saved network.";
           summary = "Runs fix-wifi.sh as root. Lines 6-8 turn Wi-Fi power saving off until the next boot and lines 11-12 restart NetworkManager, as the reason says. Line 9 deletes every saved network, with its password, which the reason doesn't mention.";
           risk = "high";
           recommendation = "deny";

@@ -28,14 +28,21 @@ function escapeArg(s) {
 
 function upper(s) { return str(s).toUpperCase() }
 
-// review.json → what the AI review section says.
+// review.json → what the AI review section says. The review line is a risk
+// badge, the recommendation and the headline, then the concerns; the
+// summary and "Can't see" are details (ⓘ). A review from before reviewers
+// wrote a headline leads with its summary instead.
 function reviewView(review, forRoot) {
   var r = review || { status: "missing" }
   var fallback = forRoot ? "Read the command." : "Check the diff."
   if (r.status === "ok") {
+    var headline = typeof r.headline === "string" ? r.headline.trim() : ""
     return {
       state: "ok",
       heading: "AI REVIEW · can be wrong",
+      headline: truncate(headline || r.summary, headline ? 200 : 300),
+      hasHeadline: headline !== "",
+      badge: upper(r.risk),
       summary: truncate(r.summary, 2000),
       risk: str(r.risk),
       recommendation: str(r.recommendation),
@@ -46,15 +53,22 @@ function reviewView(review, forRoot) {
     }
   }
   if (r.status === "pending") {
-    return { state: "pending", heading: "AI REVIEW · reviewing…", summary: "The reviewer is still reading this request; this card updates when it's done.",
+    return { state: "pending", heading: "AI REVIEW · reviewing…", headline: "Reviewer is reading this request…", hasHeadline: false,
+      badge: "", summary: "The reviewer is still reading this request; this card updates when it's done.",
       risk: "", recommendation: "", recWord: "", notes: [], notShown: [], reason: "" }
   }
   var reason = r.status === "disabled" ? "no reviewer configured"
     : r.status === "skipped" ? str(r.reason || "skipped")
     : r.status === "missing" ? "no review"
     : str(r.reason || r.status)
-  return { state: "none", heading: "No AI review (" + truncate(reason, 300) + "). " + fallback, summary: "",
-    risk: "", recommendation: "", recWord: "", notes: [], notShown: [], reason: truncate(reason, 300) }
+  return { state: "none", heading: "No AI review (" + truncate(reason, 300) + "). " + fallback, headline: "", hasHeadline: false,
+    badge: "", summary: "", risk: "", recommendation: "", recWord: "", notes: [], notShown: [], reason: truncate(reason, 300) }
+}
+
+// "Can't see: …" in one line, ending with one full stop.
+function cantSee(list) {
+  var t = list.length ? list.join("; ") : "nothing"
+  return /[.!?]$/.test(t) ? t : t + "."
 }
 
 function pkgsShort(packages) {
@@ -115,7 +129,7 @@ function changeModel(input) {
     review: rv,
     buttons: [{ id: "diff", label: "Show git diff" }, { id: "nvd", label: "nvd diff" }],
     approveLabel: rv.recommendation === "deny" ? "Approve anyway" : "Approve",
-    denyLabel: "Deny with reason…",
+    denyLabel: "Deny",
     detailsOpen: false
   }
 }
@@ -142,9 +156,10 @@ function rootModel(input) {
     command: { display: truncate(req.display || argv.join(" "), 800), argv: argv, runAs: runAs, snapshots: snaps,
       decrypt: (req.decrypt || []).map(str), notSnapshotted: rv.notShown },
     review: rv,
-    buttons: [{ id: "command", label: "Show command and script" }],
+    // The command and script are details (ⓘ), with the review's summary.
+    buttons: [],
     approveLabel: rv.risk === "high" || rv.recommendation === "deny" ? "Approve anyway" : "Approve",
-    denyLabel: "Deny with reason…",
+    denyLabel: "Deny",
     // No review: the command is the only thing to read, so it starts open.
     detailsOpen: rv.state === "none"
   }
@@ -195,6 +210,7 @@ function cardText(m) {
   function row(text) { wrap(text, W).forEach(function(l) { lines.push("│ " + pad(l, W) + " │") }) }
 
   rule(m.title, m.pendingText)
+  if (m.kind === "root") row("  " + m.command.display)
   row(m.requestHeading)
   row("  " + m.requestText)
   if (m.kind === "change") {
@@ -207,24 +223,28 @@ function cardText(m) {
     row(rv.heading)
   } else {
     sep(rv.heading)
-    row(rv.summary)
-      rv.notes.forEach(function(n, i) { row("  " + (i + 1) + ". " + n) })
-    if (rv.state === "ok") {
-      row((m.kind === "root" ? "Can't see: " + (rv.notShown.length ? rv.notShown.join("; ") : "nothing") + ".  " : "")
-        + "Risk: " + upper(rv.risk) + ".  Recommends: " + rv.recWord)
+    row(rv.state === "ok" ? "[" + rv.badge + "] " + rv.recWord + " · " + rv.headline : "… " + rv.headline)
+    rv.notes.forEach(function(n) { row("  • " + n) })
+  }
+  row(pad("", W - 3) + "(i)")
+  if (m.detailsOpen) {
+    if (rv.state !== "none") {
+      sep("DETAILS")
+      row(rv.summary)
+      if (rv.state === "ok") row("Can't see: " + cantSee(rv.notShown))
+    }
+    if (m.kind === "root") {
+      sep("COMMAND (as " + m.command.runAs + ")")
+      m.command.argv.forEach(function(a, i) { row("  argv[" + i + "] " + a) })
+      m.command.snapshots.forEach(function(s) { row("  " + s.label + "  sha256 " + s.sha256.slice(0, 16) + "…") })
     }
   }
-  if (m.kind === "root" && m.detailsOpen) {
-    sep("COMMAND (as " + m.command.runAs + ")")
-    m.command.argv.forEach(function(a, i) { row("  argv[" + i + "] " + a) })
-    m.command.snapshots.forEach(function(s) { row("  " + s.label + "  sha256 " + s.sha256.slice(0, 16) + "…") })
-  }
   sep("")
-  row(m.buttons.map(function(b) { return "[" + b.label + "]" }).join("  "))
-  row(pad("", 40) + "[" + m.denyLabel + "]   [" + m.approveLabel + "]")
+  row((m.buttons.length ? pad(m.buttons.map(function(b) { return "[" + b.label + "]" }).join("  "), 40) : pad("", 40))
+    + "[" + m.denyLabel + "]   [" + m.approveLabel + "]")
   lines.push("└" + new Array(W + 3).join("─") + "┘")
   return lines.join("\n") + "\n"
 }
 
 // For node (checks.card-goldens); QML ignores this.
-if (typeof module !== "undefined") module.exports = { cardModel: cardModel, cardText: cardText, reviewView: reviewView, escapeArg: escapeArg }
+if (typeof module !== "undefined") module.exports = { cardModel: cardModel, cardText: cardText, reviewView: reviewView, escapeArg: escapeArg, cantSee: cantSee }

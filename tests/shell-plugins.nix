@@ -177,12 +177,33 @@ pkgs.testers.runNixOSTest {
             s = state("omanix.approval")
             assert s["form"] == "root" and s["engaged"] is False, s
             machine.sleep(2)
+            assert s["review"] == "ok" and s["headline"].startswith("Restarts Wi-Fi, but line 9"), s
             machine.screenshot("card-root-command")
-            click("card.command")
+            click("card.info")
+            assert state("omanix.approval")["detail"] == "info"
             machine.sleep(1)
             machine.screenshot("card-root-command-script")
             click("card.approve")
             assert answer("w18-root") == "APPROVED"
+
+        with subtest("the review lands while the card is open: updated in place, the reason being typed kept"):
+            d = fixture("root-pending", "w18-pending")
+            request("w18-pending")
+            machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval state") + " | grep -q '\"review\":\"pending\"'", timeout=30)
+            machine.sleep(2)
+            machine.screenshot("card-root-pending")
+            click("card.deny")
+            machine.send_chars("not while")
+            machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval state") + " | grep -q '\"reason\":\"not while\"'", timeout=10)
+            # nuketown replaces review.json atomically
+            machine.succeed(f"cp ${fixtures}/root-command/review.json {d}/review.json.tmp && chgrp nuketown-approval-read {d}/review.json.tmp && chmod 640 {d}/review.json.tmp && mv -f {d}/review.json.tmp {d}/review.json")
+            machine.wait_until_succeeds("su - ${user} -c " + json.dumps("${env} /run/current-system/omarchy/bin/omarchy-shell omanix.approval state") + " | grep -q '\"review\":\"ok\"'", timeout=10)
+            s = state("omanix.approval")
+            assert s["denyOpen"] is True and s["reason"] == "not while" and s["current"] == "w18-pending", s
+            machine.sleep(1)
+            machine.screenshot("card-root-reviewed-in-place")
+            machine.send_chars(" I'm on a call\n")
+            assert answer("w18-pending") == "DENIED:not while I'm on a call", answer("w18-pending")
 
         with subtest("full change card: Deny with reason -> DENIED:<reason>"):
             fixture("full", "w18-full")
@@ -193,6 +214,9 @@ pkgs.testers.runNixOSTest {
                 dump(); raise
             machine.sleep(2)
             machine.screenshot("card-full")
+            click("card.info")
+            machine.sleep(1)
+            machine.screenshot("card-full-info")
             click("card.diff")
             machine.sleep(1)
             machine.screenshot("card-full-diff")

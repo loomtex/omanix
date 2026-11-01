@@ -29,6 +29,9 @@
   "review": {
     "state": "ok",
     "heading": "AI REVIEW · can be wrong",
+    "headline": "Enables programs.steam with the 32-bit graphics it needs and adds gamemode. Nothing else changes.",
+    "hasHeadline": false,
+    "badge": "LOW",
     "summary": "Enables programs.steam with the 32-bit graphics it needs and adds gamemode. Nothing else changes.",
     "risk": "low",
     "recommendation": "approve",
@@ -48,6 +51,6 @@
     }
   ],
   "approveLabel": "Approve",
-  "denyLabel": "Deny with reason…",
+  "denyLabel": "Deny",
   "detailsOpen": false
 }

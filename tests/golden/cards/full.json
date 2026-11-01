@@ -29,6 +29,9 @@
   "review": {
     "state": "ok",
     "heading": "AI REVIEW · can be wrong",
+    "headline": "Saves battery, but also turns Bluetooth off at every boot.",
+    "hasHeadline": true,
+    "badge": "MEDIUM",
     "summary": "Enables TLP and lowers the screen refresh rate. It also turns Bluetooth off at boot, which you did not ask for.",
     "risk": "medium",
     "recommendation": "ask",
@@ -50,6 +53,6 @@
     }
   ],
   "approveLabel": "Approve",
-  "denyLabel": "Deny with reason…",
+  "denyLabel": "Deny",
   "detailsOpen": false
 }

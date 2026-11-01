@@ -1,0 +1,22 @@
+┌─ ada wants to run a command as root ───────────────────────────────────────────────────┐
+│   bash fix-wifi.sh                                                                     │
+│ ADA'S STATED REASON                                                                    │
+│   “wifi keeps dropping; reset the driver and NetworkManager”                           │
+├─ AI REVIEW · can be wrong ─────────────────────────────────────────────────────────────┤
+│ [MEDIUM] LOOK CLOSER · Restarts Wi-Fi, but line 9 also deletes every saved network.    │
+│   • Line 9 deletes every saved Wi-Fi network and its password, which the reason        │
+│   doesn't mention.                                                                     │
+│                                                                                    (i) │
+├─ DETAILS ──────────────────────────────────────────────────────────────────────────────┤
+│ Restarts NetworkManager and reloads the iwlwifi driver with power saving off until     │
+│ reboot, as the reason says. Line 9 also deletes every saved Wi-Fi network, which the   │
+│ reason doesn't mention.                                                                │
+│ Can't see: Whether iwlwifi is the driver in use here.                                  │
+├─ COMMAND (as root) ────────────────────────────────────────────────────────────────────┤
+│   argv[0] bash                                                                         │
+│   argv[1] fix-wifi.sh                                                                  │
+│   /agents/ada/scratch/fix-wifi.sh  (runs; the snapshot is what runs)  sha256           │
+│   7077deb9bc1e5ed0…                                                                    │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│                                         [Deny]   [Approve]                             │
+└────────────────────────────────────────────────────────────────────────────────────────┘

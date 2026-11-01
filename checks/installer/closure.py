@@ -87,8 +87,10 @@ def budget(a):
             sys.exit(f"{d}: expected one .raw image, found {raws}")
         f = os.path.join(d, raws[0])
         st = os.stat(f)
+        parts = json.load(open(os.path.join(d, "repart-output.json")))
         rep["images"][label] = {"file": raws[0], "bytes": st.st_size, "allocatedBytes": st.st_blocks * 512,
-                                "zstdBytes": zstd_bytes(f)}
+                                "zstdBytes": zstd_bytes(f),
+                                "partitions": {p["label"]: p["raw_size"] for p in parts}}
     rep["cache"] = json.load(open(a.cache))
     for spec in a.closure:
         label, p = spec.split("=", 1)
@@ -103,6 +105,7 @@ def budget(a):
         im = rep["images"][label]
         print(f"{label:7} image  {im['bytes'] / gib:6.2f} GiB raw, what a release ships (budget {b[key] / gib:.2f} GiB); "
               f"{im['zstdBytes'] / gib:.2f} GiB as .raw.zst, {im['allocatedBytes'] / gib:.2f} GiB allocated (sparse)")
+        print("               " + ", ".join(f"{n} {b / mib:.0f} MiB" for n, b in im["partitions"].items()))
     print(f"CACHE          {rep['cache']['fileSize'] / gib:6.2f} GiB compressed, {rep['cache']['narSize'] / gib:.2f} GiB NAR, "
           f"{rep['cache']['paths']} paths ({rep['cache']['skippedLive']} already in the live store)")
     for label, c in rep["closures"].items():

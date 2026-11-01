@@ -144,11 +144,11 @@
         "sops-nix": "sops-nix"
       },
       "locked": {
-        "lastModified": 1793502017,
-        "narHash": "sha256-MMc26qmeb9y+ZU/RGFytnzrssnHIdQ7qc+aCDQZFxbo=",
+        "lastModified": 1793506509,
+        "narHash": "sha256-CuCGIkMDTiQi8xJmtsGY8okOVWtFV4bZqtDP1f3ceIM=",
         "ref": "v2-skeleton",
-        "rev": "12aba89bf6abc7c92cb8f56a69c82ad0b0447b35",
-        "revCount": 97,
+        "rev": "11625250c5345b78eae6ff350d39c15bcf589e85",
+        "revCount": 98,
         "type": "git",
         "url": "file:///agents/ada/projects/loom"
       },
@@ -217,11 +217,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793496757,
-        "narHash": "sha256-ggdRdcg69ZI7zm8yJPMJ0J4edBLEW0VMqMyebONn1N0=",
+        "lastModified": 1793503339,
+        "narHash": "sha256-Pej55HbPA2dpDCbzPK70CcYzG/WcpgoC+kR2/kOVtuo=",
         "owner": "joshperry",
         "repo": "nuketown",
-        "rev": "13ef8619d34b34df8e97dd4d355b10908ab497ac",
+        "rev": "68f97c9b2d84e67190cc19ba401b9a88c637c36c",
         "type": "github"
       },
       "original": {

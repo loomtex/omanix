@@ -469,7 +469,8 @@ loom.reviewer.promptDelay                  int 20       (W1b: show the card befo
 
 loom.firstboot.steps.<name>                { order; description; command; interactive; doneWhen; }
 loom.hardware.facts                        typed submodule from hardware.json
-loom.hardware.firmware                     enum ["filtered" "full"] "filtered"
+loom.hardware.firmware                     enum ["filtered" "full"] "filtered"   (per-driver linux-firmware packages: the drivers
+                                           hardware.json's modules and firmware names point at, or all; no facts = all)
 loom.installer.probes.<name>               { command (store path); emits = "quirk" | "fact"; }   (flavor-contributed)
 loom.installer.tty                         str "tty1"   (test image: "ttyS0")
 ```
@@ -795,15 +796,18 @@ OMANIX-CFG/
 
 | # | Partition | Format | Contents |
 |---|---|---|---|
-| 1 | ESP | vfat 512 MiB | systemd-boot + installer UKI (installer only; the installed system uses Limine by default, or lanzaboote, D7) |
-| 2 | STORE | erofs zstd + dm-verity | Installer closure: `minimal` + `perlless` where possible, `all-hardware`, linux-firmware (offline: the full set, shared with CACHE's reference closures; net: loom's per-driver keep list, `loom.installer.firmware`), nix, disko, cryptsetup, sbctl, tpm2-tools, age, age-plugin-tpm/-tag, age-plugin-yubikey, sops, git, gum, loom-installer, flavor probes. Includes the release cache public key. |
-| 3 | CACHE | erofs, uncompressed (the content is already `.nar.zst`), + dm-verity | Release `file://` cache: closures of `ref-default`, `ref-nvidia` and `ref-laptop`, plus `nix flake archive` of omanix and all inputs, signed `omanix-cache-1`. **Absent in the `net` variant.** |
-| 4 | OMANIX-CFG | vfat 256 MiB (flash-usb grows it) | sidecar |
+| 1 | ESP | vfat, sized at build time to its files + 4 MiB (≥ 100 MiB, repart's ESP minimum) | systemd-boot + installer UKI (installer only; the installed system uses Limine by default, or lanzaboote, D7). The live system never mounts it (`systemd.gpt_auto=0`); only systemd-boot writes there, its random seed and boot secret (32 bytes each). |
+| 2 | STORE | erofs (zstd level 15, 1 MiB physical clusters, tail packing, 4 KiB blocks) + dm-verity | Installer closure: `minimal` + `perlless` where possible, `all-hardware`, linux-firmware as per-driver packages (`loom.installer.firmware`; offline: every driver, the same packages hosts and CACHE's reference closures use; net: loom's keep list), nix, disko, cryptsetup, sbctl, tpm2-tools, age, age-plugin-tpm/-tag, age-plugin-yubikey, sops, git, gum, loom-installer, flavor probes. Includes the release cache public key. |
+| 3 | CACHE | erofs as STORE (the content is already `.nar.zst`), + dm-verity | Release `file://` cache: closures of `ref-default`, `ref-nvidia` and `ref-laptop`, plus `nix flake archive` of omanix and all inputs, signed `omanix-cache-1`. **Absent in the `net` variant.** |
+| 4 | OMANIX-CFG | vfat, the rest of the stick; **not in the image** | sidecar |
+
+- **OMANIX-CFG is made on the stick, not shipped.** The image is meant to be written with any tool (dd, Etcher, Rufus). On first boot `loom-cfg-partition` runs systemd-repart on the stick (definitions: a `Weight=0` placeholder for each linux-generic partition before CFG, then CFG: `linux-generic`, label `OMANIX-CFG`, vfat, ≥ 40 MiB, all the free space) and moves the backup GPT to the end; later boots find it and change nothing. With no room after the image it warns on the console and the installer runs without CFG (no sidecar, no install-cache). `loom-flash write` makes the same partition itself after writing the image (`sidecar` reuses or makes it), so a configured stick never needs a first boot to exist.
+- dm-verity is off for v1 (systemd 262 `/dev/mapper/usr`), so the installer runs `nix-store --verify --check-contents` and checks CACHE's NARs instead.
 
 - **Verity is corruption detection, not authenticity.** The root hashes sit on the unsigned ESP cmdline. Authenticity comes from `SHA256SUMS.sig` over the image file, which `flash-usb` verifies, plus the readback hash after writing. On a verity error the installer says "This USB stick is damaged. Re-flash it."
 - The installer is not Secure Boot-signed. To boot it, the user disables Secure Boot or puts the firmware in **Setup Mode**. Setup Mode is also what enables the TPM2-automatic option (§e.6).
 - Size checks:
-  - `checks.closure-budget`: offline image ≤ 6 GiB (the bar is omarchy's ~6 GB), net image ≤ 2 GiB, both the `.raw` a release ships (it also prints the `.raw.zst` size); measured 5.41 and 1.74 GiB (2026-10-31);
+  - `checks.closure-budget`: offline image ≤ 5 GiB (omarchy's ISO is ~6 GB), net image ≤ 1 GiB, both the `.raw` a release ships (it also prints the `.raw.zst` size, the allocated size and each partition); measured 4.39 GiB (ESP 100 MiB, STORE 1.60 GiB, CACHE 2.70 GiB; 4.26 GiB as `.raw.zst`) and 0.83 GiB (ESP 100 MiB, STORE 748 MiB; 0.71 GiB `.raw.zst`) on 2026-11-01, from 5.41 and 1.74 GiB before CFG left the image and the ESP was sized to its files;
   - `system.forbiddenDependenciesRegexes` (`-doc$`, `texlive`, `ghc-`);
   - `checks.closure-dupes`: no second Mesa, LLVM or Python major.
 - The installed store is the `@nix` subvolume (`compress=zstd,noatime`) with `auto-optimise-store`.
@@ -878,8 +882,9 @@ loom-flash write --device /dev/disk/by-id/usb-… --confirm <token> [--sidecar <
   re-resolves the device and recomputes the token (a different stick or image ⇒ exit 2)
   TTY present: also require typing the last 4 characters of the serial
   verifies SHA256SUMS.sig (pinned signers) + image hash → dd oflag=direct conv=fsync → re-read GPT →
-  read back and hash the written range → grow OMANIX-CFG → copy the sidecar → verify SHA256SUMS → sync → eject
-loom-flash sidecar --device … --confirm <token> --sidecar <dir>     # rewrite the sidecar only
+  read back and hash the written range → make OMANIX-CFG after the image, to the end of the stick
+  (grow it, for an image that still carries one) → copy the sidecar → verify SHA256SUMS → sync → eject
+loom-flash sidecar --device … --confirm <token> --sidecar <dir>     # rewrite the sidecar only (makes CFG if missing)
 ```
 
 - An agent may run `plan` freely. `write` needs a token from a `plan` run against the same physical device and image.
@@ -932,7 +937,7 @@ loom-flash sidecar --device … --confirm <token> --sidecar <dir>     # rewrite 
 - FIDO2 (`systemd-cryptenroll --fido2-device=list`, `hmac-secret`)
 - Secure Boot state (`off` | `on (vendor keys)` | `setup mode`)
 - CPU, GPU, DMI, PCI/USB ids, RAM
-- firmware globs (`modinfo -F firmware` of bound modules)
+- bound kernel modules and their firmware globs (`modinfo -F firmware`). `loom.hardware` maps both to loom's per-driver linux-firmware packages (WHENCE driver = module name, or a driver that ships a named file), the same derivations the reference hosts carry in full, so an offline install finds the host's firmware in CACHE.
 - **flavor probes** from `loom.installer.probes`. omanix contributes omarchy's read-only `omarchy-hw-*` predicates as store paths, which yields `quirks[]`.
 
 **2. Disk.** Whole disk only.

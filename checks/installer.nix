@@ -21,16 +21,17 @@ let
   #
   # Measured 2026-11-01 (nixos-unstable 31ecbac, linux-firmware 20261019).
   # No OMANIX-CFG in the image (the first boot or loom-flash makes it), the
-  # ESP sized to its files (repart's 100 MiB ESP minimum: the UKI is 42 MB),
-  # STORE and CACHE erofs zstd 15 with 1 MiB pclusters and tail packing:
-  #   offline 4.39 GiB raw (4.26 GiB .zst): ESP 100 MiB + STORE 1.60 GiB +
+  # ESP sized to its files (repart's 100 MiB ESP minimum: the files are
+  # 43 MB), STORE and CACHE erofs zstd 15 with 1 MiB pclusters (no tail
+  # packing: mkfs.erofs 1.9.4 corrupts zstd tails; loom reads both back):
+  #   offline 4.46 GiB raw (4.24 GiB .zst): ESP 100 MiB + STORE 1.67 GiB +
   #     CACHE 2.70 GiB. Was 5.41 GiB (ESP 512 MiB, STORE 1.98 GiB, CACHE
   #     2.68 GiB, CFG 256 MiB). The live store shares every per-driver
   #     firmware package with CACHE's reference closures. CACHE is .nar.zst:
-  #     zstd 15 saves 1.4 MB there. Budget 5 GiB: ~14% headroom.
-  #   net 0.83 GiB raw (0.71 GiB .zst): ESP 100 MiB + STORE 748 MiB (closure
+  #     zstd 15 saves 1.4 MB there. Budget 5 GiB: ~12% headroom.
+  #   net 0.85 GiB raw (0.72 GiB .zst): ESP 100 MiB + STORE 771 MiB (closure
   #     1.36 GiB NAR). Was 1.74 GiB (ESP 512 MiB, STORE 1015 MiB, CFG
-  #     256 MiB). Budget 1 GiB: ~20% headroom.
+  #     256 MiB). Budget 1 GiB: ~17% headroom.
   budget = {
     offlineImage = 5 * 1024 * 1024 * 1024;     # 5 GiB
     netImage = 1024 * 1024 * 1024;             # 1 GiB
